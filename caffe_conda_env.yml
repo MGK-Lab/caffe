@@ -1,0 +1,9 @@
+name: caffe
+channels:
+  - defaults
+dependencies:
+  - setuptools
+  - cython
+  - numpy
+  - rasterio
+prefix: /home/maziar/miniconda3/envs/caffe
