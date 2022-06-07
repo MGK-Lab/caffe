@@ -1,9 +1,13 @@
-name: caffe
+# run conda env create -f caffe_conda_env.yml
+
+name: caffe_test
 channels:
   - defaults
 dependencies:
-  - setuptools
+  - python=3.9.12
   - cython
   - numpy
   - rasterio
-prefix: /home/maziar/miniconda3/envs/caffe
+  - pip
+  - pip:
+    - pyswmm
