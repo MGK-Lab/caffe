@@ -1,4 +1,4 @@
-from . import caffe_core as cc
+import caffe_core as cc
 import numpy as np
 import time
 import rasterio as rio
