@@ -1,6 +1,6 @@
 # run conda env create -f caffe_conda_env.yml
 
-name: caffe_test
+name: caffe
 channels:
   - defaults
 dependencies:
