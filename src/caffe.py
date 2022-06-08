@@ -1,6 +1,4 @@
-# python3 run_Caffe.py
-
-import Caffe
+from . import caffe_core as cc
 import numpy as np
 import time
 import rasterio as rio
@@ -21,31 +19,33 @@ def arraytoRasterIO(array, existingraster, dst_filename):
         dst.write(array, 1)
 
 
-def run_CAffe(dem_file, increment_constant, hf, result_path, result_name, EV_threshold):
+def run_caffe(dem_file, increment_constant, hf, result_path, result_name, EV_threshold):
     """ This function has three main actions:
         1. Preprocessing: which involves reading digital elevation model (DEM) raster files of topography into numpy arrays and preparing pther necessary inputs for the CAffe_engine
         2. running CAffe_engine
         3. Post-processing which is saving 2D arrays of estimated results into gis raster maps"""
 
     # Pre-processing
-    src = rio.open(dem_file)  # reads digital elevation model (DEM file)
-    dtypee = src.profile['dtype']
-    print(dtypee)
+    # reads digital elevation model (DEM file) of the 1st layer (band = 1)
+    src = rio.open(dem_file)
+    band = 1
+    dem_array = src.read(band)
+    msk = src.read_masks(band)
 
-    cell_area = 1  # we know the test data has a cell area of 1 meter
-    dem_array = src.read(1)
-    mask = np.zeros_like(dem_array, dtype=bool)
-    msk = src.read_masks(1)
+    # unrealistic height to invalid data
     dem_array[msk == 0] = 100000
-    mask[msk == 0] = True
     DEM = np.array(dem_array, dtype=np.float32)
 
-    DEMshape0, DEMshape1 = DEM.shape[0], DEM.shape[1]
+    DEMshape0, DEMshape1 = DEM.shape
 
+    mask = np.zeros_like(dem_array, dtype=bool)
+    mask[msk == 0] = True
     mask[0, :] = True
     mask[-1, :] = True
     mask[:, 0] = True
     mask[:, -1] = True
+
+    cell_area = 1  # we know the test data has a cell area of 1 meter
 
     # CAffe_engine is designed to work with 1D arrays to provide faster simulations
     dem = DEM.ravel()
@@ -71,8 +71,8 @@ def run_CAffe(dem_file, increment_constant, hf, result_path, result_name, EV_thr
     length = int(len(extra_volume_map) - DEMshape1)
 
     # 2. running CAffe_engine
-    Caffe.CAffe_engine(water_levels, extra_volume_map, max_f, DEMshape0,
-                       DEMshape1, cell_area, total_vol, increment_constant, hf, EV_threshold, length)
+    cc.CAffe_engine(water_levels, extra_volume_map, max_f, DEMshape0,
+                    DEMshape1, cell_area, total_vol, increment_constant, hf, EV_threshold, length)
 
     # 3. Post-processing
     water_levels = water_levels.reshape(DEMshape0, DEMshape1)
@@ -108,18 +108,3 @@ def run_CAffe(dem_file, increment_constant, hf, result_path, result_name, EV_thr
 
     print(max_water_depth.shape)
     print("Simulation finished in", (time.time() - now), "seconds")
-
-
-if __name__ == "__main__":
-
-    # user input data:
-    input_DEM_file = './data/dem_s1.tif'
-    hf = 0.09                   # First CAffe model parameter selected by user
-    increment_constant = 0.0005  # Second CAffe model parameter selected by user
-    EV_threshold = 0.00002
-    result_path = './results/'
-    result_name = "hf" + str(hf)+"_IC_" + str(increment_constant)
-
-    # run model
-    run_CAffe(input_DEM_file, increment_constant, hf,
-              result_path, result_name, EV_threshold)
