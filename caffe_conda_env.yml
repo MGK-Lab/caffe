@@ -3,6 +3,7 @@
 name: caffe
 channels:
   - defaults
+  - ./channel
 dependencies:
   - python=3.9.12
   - cython
@@ -11,3 +12,5 @@ dependencies:
   - pip
   - pip:
     - pyswmm
+  - hymo
+  - pytest
