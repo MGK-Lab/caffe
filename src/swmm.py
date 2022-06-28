@@ -1,6 +1,6 @@
 from pyswmm import Simulation, Nodes
-import numpy as np
 import hymo
+import numpy as np
 import pandas as pd
 
 
@@ -25,6 +25,8 @@ class swmm:
         self.nodes_info = pd.concat(
             [self._hymo_inp.coordinates, self.nodes_info], axis=1)
 
+        self.node_list = list(self.nodes_info.index.values)
+
     def MapInfo(self, dim, unit):
         # should be first implemented in hymo
         pass
@@ -32,13 +34,38 @@ class swmm:
     def InteractionInterval(self, sec):
         self.sim.step_advance(sec)
 
-    def NodeFunction(self, function):
-        function(self.nodes)
+    def setNodesInflow(self, N_In):
+        i = 0
+        for n in self.node_list:
+            self.nodes[n].generated_inflow(N_In[i])
+            i += 1
 
-    def StartSimulation(self):
-        for step in self.sim:
-            for n in self.nodes:
-                self.NodeFunction(n)
+    def getNodesHead(self):
+        H = np.zeros(len(self.node_list))
+        i = 0
+        for n in self.node_list:
+            H[i] = self.nodes[n].head
+            i += 1
+
+        return H
+
+    def getNodesTotalInflow(self):
+        TI = np.zeros(len(self.node_list))
+        i = 0
+        for n in self.node_list:
+            TI[i] = self.nodes[n].total_inflow
+            i += 1
+
+        return TI
+
+    def getNodesTotalOutflow(self):
+        TO = np.zeros(len(self.node_list))
+        i = 0
+        for n in self.node_list:
+            TO[i] = self.nodes[n].total_outflow
+            i += 1
+
+        return TO
 
     def FinishSimulation(self):
         self.sim.report()

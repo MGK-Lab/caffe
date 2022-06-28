@@ -1,8 +1,9 @@
 from src.swmm import swmm
-import pyswmm
+import numpy as np
 
 swmm_obj = swmm('./tests/tutorial.inp')
 swmm_obj.LoadNodes()
-swmm_obj.StartSimulation()
+for step in swmm_obj.sim:
+    print(swmm_obj.getJunctionHead())
+    swmm_obj.setJunctionInflow(np.zeros(len(swmm_obj.node_list)))
 swmm_obj.FinishSimulation()
-# swmm_obj.NodeFunction(maz)
