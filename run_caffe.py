@@ -1,4 +1,4 @@
-from src import caffe
+from src.caffe import caffe, run_caffe
 
 if __name__ == "__main__":
 
@@ -11,5 +11,6 @@ if __name__ == "__main__":
     result_name = "hf" + str(hf)+"_IC_" + str(increment_constant)
 
     # run model
-    caffe.run_caffe(input_DEM_file, increment_constant, hf,
-                    result_path, result_name, EV_threshold)
+    # run_caffe(input_DEM_file, increment_constant, hf,
+    # result_path, result_name, EV_threshold)
+    maz = caffe('./tests/dem_s1.tif')

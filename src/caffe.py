@@ -3,13 +3,30 @@ import numpy as np
 import time
 from . import util
 
-now = time.time()
+
+class caffe():
+    def __init__(self, dem_file):
+        self.begining = time.time()
+        print("\n .....loading DEM file using CA-ffé.....")
+        self.DEM, self.mask = util.DEMRead(dem_file)
+        print("\n ")
+
+    def setWaterDepthZero(self):
+        self.water_levels = np.copy(self.DEM).astype(np.float32)
+
+    def setDEMCellSize(self, length):
+        self.cell_area = length**2
+
+    def RunSimulation(slf):
+        pass
 
 
 def run_caffe(dem_file, increment_constant, hf, result_path, result_name, EV_threshold):
     """ This function has three main actions:
         2. running CAffe_engine
         3. Post-processing which is saving 2D arrays of estimated results into gis raster maps"""
+
+    now = time.time()
 
     # Pre-processing
     DEM, mask = util.DEMRead(dem_file)

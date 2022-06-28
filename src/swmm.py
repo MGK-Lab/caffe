@@ -5,12 +5,13 @@ import pandas as pd
 
 
 class swmm:
-    def __init__(self, inpfile):
+    def __init__(self, inp_file):
         # load PySWMM
-        self.sim = Simulation(inpfile)
+        print("\n .....loading SWMM inputfile using PySWMM.....")
+        self.sim = Simulation(inp_file)
         print("\n")
         # load SWMM input file using hyno package
-        self._hymo_inp = hymo.SWMMInpFile(inpfile)
+        self._hymo_inp = hymo.SWMMInpFile(inp_file)
 
     def LoadNodes(self):
         self.nodes = Nodes(self.sim)
