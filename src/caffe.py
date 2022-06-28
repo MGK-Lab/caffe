@@ -1,49 +1,20 @@
 import caffe_core as cc
 import numpy as np
 import time
-import rasterio as rio
+from . import util
 
 now = time.time()
 
 
-def arraytoRasterIO(array, existingraster, dst_filename):
-    """this function is used to save a 2D numpy array as a GIS raster map"""
-    with rio.open(existingraster) as src:
-        naip_meta = src.profile
-
-    naip_meta['count'] = 1
-    naip_meta['nodata'] = -999
-
-    # write your the ndvi raster object
-    with rio.open(dst_filename, 'w', **naip_meta) as dst:
-        dst.write(array, 1)
-
-
 def run_caffe(dem_file, increment_constant, hf, result_path, result_name, EV_threshold):
     """ This function has three main actions:
-        1. Preprocessing: which involves reading digital elevation model (DEM) raster files of topography into numpy arrays and preparing pther necessary inputs for the CAffe_engine
         2. running CAffe_engine
         3. Post-processing which is saving 2D arrays of estimated results into gis raster maps"""
 
     # Pre-processing
-    # reads digital elevation model (DEM file) of the 1st layer (band = 1)
-    src = rio.open(dem_file)
-    band = 1
-    dem_array = src.read(band)
-    msk = src.read_masks(band)
-
-    # unrealistic height to invalid data
-    dem_array[msk == 0] = 100000
-    DEM = np.array(dem_array, dtype=np.float32)
+    DEM, mask = util.DEMRead(dem_file)
 
     DEMshape0, DEMshape1 = DEM.shape
-
-    mask = np.zeros_like(dem_array, dtype=bool)
-    mask[msk == 0] = True
-    mask[0, :] = True
-    mask[-1, :] = True
-    mask[:, 0] = True
-    mask[:, -1] = True
 
     cell_area = 1  # we know the test data has a cell area of 1 meter
 
@@ -92,19 +63,19 @@ def run_caffe(dem_file, increment_constant, hf, result_path, result_name, EV_thr
     print("sum water depths:", np.sum(water_depth) * cell_area)
     extra_volume_map = extra_volume_map.reshape(DEMshape0, DEMshape1)
     extra_volume_map[mask] += 1 * (10 ** 6)
-    print("total_volume_to_out:", np.sum(extra_volume_map[mask]))
+    print("total volume to out:", np.sum(extra_volume_map[mask]))
     print("left excess volume:", np.sum(extra_volume_map[mask == False]))
 
     wl_filename = result_path + result_name + 'wl.tif'
+    util.arraytoRasterIO(water_levels, dem_file, wl_filename)
 
-    wl_filename = result_path + result_name + 'wl.tif'
-    arraytoRasterIO(water_levels, dem_file, wl_filename)
     depth_filename = result_path + result_name + 'depth.tif'
-    arraytoRasterIO(np.array(water_depth, dtype=np.float32),
-                    dem_file, depth_filename)
+    util.arraytoRasterIO(np.array(water_depth, dtype=np.float32),
+                         dem_file, depth_filename)
+
     max_depth_filename = result_path + result_name + 'max_depth.tif'
-    arraytoRasterIO(np.array(max_water_depth, dtype=np.float32),
-                    dem_file, max_depth_filename)
+    util.arraytoRasterIO(np.array(max_water_depth, dtype=np.float32),
+                         dem_file, max_depth_filename)
 
     print(max_water_depth.shape)
     print("Simulation finished in", (time.time() - now), "seconds")

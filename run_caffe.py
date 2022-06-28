@@ -1,5 +1,3 @@
-# python3 run_caffe.py
-
 from src import caffe
 
 if __name__ == "__main__":
