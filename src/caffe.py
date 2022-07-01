@@ -1,6 +1,5 @@
 import caffe_core as cc
 import numpy as np
-import warnings as ws
 import time
 import sys
 from . import util
@@ -20,7 +19,7 @@ class caffe():
         self.cell_area = 1
         self.setConstants_has_been_called = False
         self.water_levels = np.copy(self.DEM).astype(np.float32)
-        self.extra_volume_map = np.zeros_like(self.DEM, dtype=np.float32)
+        self.excess_volume_map = np.zeros_like(self.DEM, dtype=np.float32)
         self.outputs_path = "./"
         name = dem_file.split('.')
         name = name[1].split('/')
@@ -37,11 +36,11 @@ class caffe():
     def setOutputName(self, fn):
         self.outputs_name = fn
 
-    def ExtraVolumeMapArray(self, EVM_np):
+    def ExcessVolumeMapArray(self, EVM_np):
         EVM_np[:, 0] = EVM_np[:, 0] / self.length - 1
         EVM_np[:, 1] = EVM_np[:, 1] / self.length - 1
         for r in EVM_np:
-            self.extra_volume_map[r[0], r[1]] = r[2]
+            self.excess_volume_map[r[0], r[1]] = r[2]
 
     def setConstants(self, hf, ic, EVt):
         self.setConstants_has_been_called = True
@@ -59,25 +58,28 @@ class caffe():
         self.begining = time.time()
         if not self.setConstants_has_been_called:
             sys.exit(
-                "CA-ffé constants were not set by the user, use setConstants method and try again")
+                "CA-ffé constants were not set by the user, use setConstants",
+                " method and try again")
 
-        self.extra_total_volume = np.sum(self.extra_volume_map)
-        print("total volume to be spread (m3) =", self.extra_total_volume)
-        self.extra_water_column_map = self.extra_volume_map / self.cell_area
-        # For masked areas (i.e. borders of the calculation domain), a very large negative number is picked in order to make sure that these cells will never be activated during the simulation
-        self.extra_water_column_map[self.mask] = -1*(10**6)
+        self.excess_total_volume = np.sum(self.excess_volume_map)
+        print("total volume to be spread (m3) =", self.excess_total_volume)
+        self.excess_water_column_map = self.excess_volume_map / self.cell_area
+        # For masked areas (i.e. borders of the calculation domain),
+        # a very large negative number is picked in order to make sure that
+        # these cells will never be activated during the simulation
+        self.excess_water_column_map[self.mask] = -1*(10**6)
 
-        # CAffe_engine is designed to work with 1D arrays to provide faster simulations
+        # CAffe_engine works with 1D arrays to provide faster simulations
         self.DEM1d = self.DEM.ravel()
-        self.extra_water_column_map = self.extra_water_column_map.ravel()
+        self.excess_water_column_map = self.excess_water_column_map.ravel()
         self.max_f = np.zeros_like(
-            self.extra_water_column_map, dtype=np.float32)
+            self.excess_water_column_map, dtype=np.float32)
         self.water_levels = self.water_levels.ravel()
-        l = int(len(self.extra_water_column_map) - self.DEMshape[1])
+        l = int(len(self.excess_water_column_map) - self.DEMshape[1])
 
-        cc.CAffe_engine(self.water_levels, self.extra_water_column_map,
+        cc.CAffe_engine(self.water_levels, self.excess_water_column_map,
                         self.max_f, self.DEMshape[0], self.DEMshape[1],
-                        self.cell_area, self.extra_total_volume, self.ic,
+                        self.cell_area, self.excess_total_volume, self.ic,
                         self.hf, self.EVt, l)
 
         self.water_levels = self.water_levels.reshape(self.DEMshape)
@@ -96,7 +98,8 @@ class caffe():
 
         self.DEM[self.mask] = 0
 
-        print("Simulation finished in", (time.time() - self.begining), "seconds")
+        print("Simulation finished in", (time.time() - self.begining),
+              "seconds")
 
     def Report(self):
         print("\n")
@@ -114,13 +117,13 @@ class caffe():
 
         print("Sum spreaded water volume: ", np.sum(
             self.water_depths) * self.cell_area)
-        self.extra_water_column_map = self.extra_water_column_map.reshape(
+        self.excess_water_column_map = self.excess_water_column_map.reshape(
             self.DEMshape)
-        self.extra_water_column_map[self.mask] += 1 * (10 ** 6)
+        self.excess_water_column_map[self.mask] += 1 * (10 ** 6)
         print("Total volume to out:", np.sum(
-            self.extra_water_column_map[self.mask]) * self.cell_area)
+            self.excess_water_column_map[self.mask]) * self.cell_area)
         print("Left excess volume:", np.sum(
-            self.extra_water_column_map[self.mask == False]) * self.cell_area)
+            self.excess_water_column_map[self.mask == False]) * self.cell_area)
 
         fn = self.outputs_path + self.outputs_name + '_wl.tif'
         util.arraytoRasterIO(self.water_levels, self.dem_file, fn)
