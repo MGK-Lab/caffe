@@ -68,7 +68,7 @@ class swmm:
 
         return TO
 
-    def FinishSimulation(self):
+    def CloseSimulation(self):
         self.sim.report()
         self.sim.close()
         print("\n")

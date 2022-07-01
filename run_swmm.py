@@ -8,4 +8,4 @@ if __name__ == "__main__":
     for step in swmm_obj.sim:
         print(swmm_obj.getNodesHead())
         swmm_obj.setNodesInflow(np.zeros(len(swmm_obj.node_list)))
-    swmm_obj.FinishSimulation()
+    swmm_obj.CloseSimulation()

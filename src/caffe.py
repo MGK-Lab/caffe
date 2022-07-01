@@ -1,98 +1,132 @@
 import caffe_core as cc
 import numpy as np
+import warnings as ws
 import time
+import sys
 from . import util
 
 
 class caffe():
     def __init__(self, dem_file):
-        self.begining = time.time()
         print("\n .....loading DEM file using CA-ffé.....")
-        self.DEM, self.mask = util.DEMRead(dem_file)
-        print("\n ")
+        print("\n", time.ctime(), "\n")
 
-    def setWaterDepthZero(self):
+        self.dem_file = dem_file
+        self.DEM, self.mask = util.DEMRead(dem_file)
+        self.DEMshape = self.DEM.shape
+
+        # to initialise a CAffe model
+        self.length = 1
+        self.cell_area = 1
+        self.setConstants_has_been_called = False
         self.water_levels = np.copy(self.DEM).astype(np.float32)
+        self.extra_volume_map = np.zeros_like(self.DEM, dtype=np.float32)
+        self.outputs_path = "./"
+        name = dem_file.split('.')
+        name = name[1].split('/')
+        self.outputs_name = name[-1] + "_out"
+
+    def CloseSimulation(self):
+        print("\n .....closing and reporting the CA-ffé simulation.....")
+        self.Report()
+        print("\n", time.ctime(), "\n")
+
+    def setOutputPath(self, fp):
+        self.outputs_path = fp
+
+    def setOutputName(self, fn):
+        self.outputs_name = fn
+
+    def ExtraVolumeMapArray(self, EVM_np):
+        EVM_np[:, 0] = EVM_np[:, 0] / self.length - 1
+        EVM_np[:, 1] = EVM_np[:, 1] / self.length - 1
+        for r in EVM_np:
+            self.extra_volume_map[r[0], r[1]] = r[2]
+
+    def setConstants(self, hf, ic, EVt):
+        self.setConstants_has_been_called = True
+        # First CAffe model parameter selected by user
+        self.hf = hf
+        # Second CAffe model parameter selected by user
+        self.ic = ic
+        self.EVt = EVt
 
     def setDEMCellSize(self, length):
+        self.length = length
         self.cell_area = length**2
 
-    def RunSimulation(slf):
-        pass
+    def RunSimulation(self):
+        self.begining = time.time()
+        if not self.setConstants_has_been_called:
+            sys.exit(
+                "CA-ffé constants were not set by the user, use setConstants method and try again")
 
+        self.extra_total_volume = np.sum(self.extra_volume_map)
+        print("total volume to be spread (m3) =", self.extra_total_volume)
+        self.extra_water_column_map = self.extra_volume_map / self.cell_area
+        # For masked areas (i.e. borders of the calculation domain), a very large negative number is picked in order to make sure that these cells will never be activated during the simulation
+        self.extra_water_column_map[self.mask] = -1*(10**6)
 
-def run_caffe(dem_file, increment_constant, hf, result_path, result_name, EV_threshold):
-    """ This function has three main actions:
-        2. running CAffe_engine
-        3. Post-processing which is saving 2D arrays of estimated results into gis raster maps"""
+        # CAffe_engine is designed to work with 1D arrays to provide faster simulations
+        self.DEM1d = self.DEM.ravel()
+        self.extra_water_column_map = self.extra_water_column_map.ravel()
+        self.max_f = np.zeros_like(
+            self.extra_water_column_map, dtype=np.float32)
+        self.water_levels = self.water_levels.ravel()
+        l = int(len(self.extra_water_column_map) - self.DEMshape[1])
 
-    now = time.time()
+        cc.CAffe_engine(self.water_levels, self.extra_water_column_map,
+                        self.max_f, self.DEMshape[0], self.DEMshape[1],
+                        self.cell_area, self.extra_total_volume, self.ic,
+                        self.hf, self.EVt, l)
 
-    # Pre-processing
-    DEM, mask = util.DEMRead(dem_file)
+        self.water_levels = self.water_levels.reshape(self.DEMshape)
+        self.water_levels[self.mask] = 0
 
-    DEMshape0, DEMshape1 = DEM.shape
+        self.water_depths = self.water_levels - self.DEM
+        self.water_depths[self.mask] = 0
 
-    cell_area = 1  # we know the test data has a cell area of 1 meter
+        self.max_water_levels = self.max_f.reshape(self.DEMshape)
+        self.max_water_levels = np.maximum(
+            self.water_levels, self.max_water_levels)
+        self.max_water_levels[self.mask] = 0
 
-    # CAffe_engine is designed to work with 1D arrays to provide faster simulations
-    dem = DEM.ravel()
-    # at the start of simulation, water level is equal to ground level (i.e. water depeth = 0)
-    water_levels = np.copy(dem).astype(np.float32)
-    # extra_volume_map is an array that include flood water volumes to be spread in the simulation
-    extra_volume_map = np.zeros_like(DEM, dtype=np.float32)
-    # for this case we assume that at point (118, 703) we have a flooding event that generated 8,000 m3 flood water.
-    extra_volume_map[118, 703] = 8000
+        self.max_water_depths = self.max_water_levels - self.DEM
+        self.max_water_depths[self.mask] = 0
 
-    total_vol = np.sum(extra_volume_map)
-    print("\nstarted run at:", time.ctime())
-    print("total volume to be spread (m3) =", total_vol)
+        self.DEM[self.mask] = 0
 
-    # turn volume into depth of water column
-    extra_volume_map = extra_volume_map / cell_area
-    # for masked areas (i.e. borders of the calculation domain) we pick a very large negative number in order to make sure that these cells will never be activated during the simulation
-    extra_volume_map[mask] = -1*(10**6)
+        print("Simulation finished in", (time.time() - self.begining), "seconds")
 
-    extra_volume_map = extra_volume_map.ravel()
-    max_f = np.zeros_like(extra_volume_map, dtype=np.float32)
+    def Report(self):
+        print("\n")
+        print("water depth (min, max): ", np.min(
+            self.water_depths), ", ", np.max(self.water_depths))
 
-    length = int(len(extra_volume_map) - DEMshape1)
+        print("max water depth (min, max): ", np.min(self.max_water_depths),
+              ", ", np.max(self.max_water_depths))
 
-    # 2. running CAffe_engine
-    cc.CAffe_engine(water_levels, extra_volume_map, max_f, DEMshape0,
-                    DEMshape1, cell_area, total_vol, increment_constant, hf, EV_threshold, length)
+        print("water level (min, max): ", np.min(
+            self.water_levels), ", ", np.max(self.water_levels))
 
-    # 3. Post-processing
-    water_levels = water_levels.reshape(DEMshape0, DEMshape1)
-    water_depth = water_levels - DEM
-    print(np.min(water_depth), np.max(water_depth))
-    water_depth[mask] = 0
-    water_levels[mask] = 0
-    DEM[mask] = 0
-    max_water_level = max_f.reshape(DEMshape0, DEMshape1)
-    print(np.min(max_water_level), np.max(max_water_level))
-    max_water_level = np.maximum(water_levels, max_water_level)
-    max_water_depth = max_water_level - DEM
-    max_water_depth[mask] = 0
-    print(np.min(max_water_level), np.max(max_water_level))
-    print(np.min(max_water_depth), np.max(max_water_depth))
+        print("max water level (min, max): ", np.min(self.max_water_levels),
+              ", ", np.max(self.max_water_levels))
 
-    print("sum water depths:", np.sum(water_depth) * cell_area)
-    extra_volume_map = extra_volume_map.reshape(DEMshape0, DEMshape1)
-    extra_volume_map[mask] += 1 * (10 ** 6)
-    print("total volume to out:", np.sum(extra_volume_map[mask]))
-    print("left excess volume:", np.sum(extra_volume_map[mask == False]))
+        print("Sum spreaded water volume: ", np.sum(
+            self.water_depths) * self.cell_area)
+        self.extra_water_column_map = self.extra_water_column_map.reshape(
+            self.DEMshape)
+        self.extra_water_column_map[self.mask] += 1 * (10 ** 6)
+        print("Total volume to out:", np.sum(
+            self.extra_water_column_map[self.mask]) * self.cell_area)
+        print("Left excess volume:", np.sum(
+            self.extra_water_column_map[self.mask == False]) * self.cell_area)
 
-    wl_filename = result_path + result_name + 'wl.tif'
-    util.arraytoRasterIO(water_levels, dem_file, wl_filename)
+        fn = self.outputs_path + self.outputs_name + '_wl.tif'
+        util.arraytoRasterIO(self.water_levels, self.dem_file, fn)
 
-    depth_filename = result_path + result_name + 'depth.tif'
-    util.arraytoRasterIO(np.array(water_depth, dtype=np.float32),
-                         dem_file, depth_filename)
+        fn = self.outputs_path + self.outputs_name + '_wd.tif'
+        util.arraytoRasterIO(self.water_depths, self.dem_file, fn)
 
-    max_depth_filename = result_path + result_name + 'max_depth.tif'
-    util.arraytoRasterIO(np.array(max_water_depth, dtype=np.float32),
-                         dem_file, max_depth_filename)
-
-    print(max_water_depth.shape)
-    print("Simulation finished in", (time.time() - now), "seconds")
+        fn = self.outputs_path + self.outputs_name + '_mwd.tif'
+        util.arraytoRasterIO(self.max_water_depths, self.dem_file, fn)
