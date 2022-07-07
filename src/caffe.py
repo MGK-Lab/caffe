@@ -75,12 +75,10 @@ class caffe():
         self.max_f = np.zeros_like(
             self.excess_water_column_map, dtype=np.float32)
         self.water_levels = self.water_levels.ravel()
-        l = int(len(self.excess_water_column_map) - self.DEMshape[1])
 
         cc.CAffe_engine(self.water_levels, self.excess_water_column_map,
-                        self.max_f, self.DEMshape[0], self.DEMshape[1],
-                        self.cell_area, self.excess_total_volume, self.ic,
-                        self.hf, self.EVt, l)
+                        self.max_f, np.asarray(self.DEMshape), self.cell_area,
+                        self.excess_total_volume, self.ic, self.hf, self.EVt)
 
         self.water_levels = self.water_levels.reshape(self.DEMshape)
         self.water_levels[self.mask] = 0
@@ -103,26 +101,26 @@ class caffe():
 
     def Report(self):
         print("\n")
-        print("water depth (min, max): ", np.min(
+        print("water depth (min, max):     ", np.min(
             self.water_depths), ", ", np.max(self.water_depths))
 
         print("max water depth (min, max): ", np.min(self.max_water_depths),
               ", ", np.max(self.max_water_depths))
 
-        print("water level (min, max): ", np.min(
+        print("water level (min, max):     ", np.min(
             self.water_levels), ", ", np.max(self.water_levels))
 
         print("max water level (min, max): ", np.min(self.max_water_levels),
               ", ", np.max(self.max_water_levels))
 
-        print("Sum spreaded water volume: ", np.sum(
+        print("Sum spreaded water volume:  ", np.sum(
             self.water_depths) * self.cell_area)
         self.excess_water_column_map = self.excess_water_column_map.reshape(
             self.DEMshape)
         self.excess_water_column_map[self.mask] += 1 * (10 ** 6)
-        print("Total volume to out:", np.sum(
+        print("Total volume to out:        ", np.sum(
             self.excess_water_column_map[self.mask]) * self.cell_area)
-        print("Left excess volume:", np.sum(
+        print("Left excess volume:         ", np.sum(
             self.excess_water_column_map[self.mask == False]) * self.cell_area)
 
         fn = self.outputs_path + self.outputs_name + '_wl.tif'
@@ -132,4 +130,5 @@ class caffe():
         util.arraytoRasterIO(self.water_depths, self.dem_file, fn)
 
         fn = self.outputs_path + self.outputs_name + '_mwd.tif'
+        util.arraytoRasterIO(self.max_water_depths, self.dem_file, fn)
         util.arraytoRasterIO(self.max_water_depths, self.dem_file, fn)
