@@ -1,4 +1,5 @@
 import rasterio as rio
+from rasterio.profiles import DefaultGTiffProfile
 import numpy as np
 
 
@@ -35,3 +36,18 @@ def DEMRead(dem_file):
     mask[:, -1] = True
 
     return DEM, mask
+
+
+def DEMGenerate(npa, dst_filename):
+    """this function is used to generate digital elevation model (DEM file) of
+    the 1st layer (band = 1) using a numpy array"""
+    profile = DefaultGTiffProfile(count=1)
+    profile['nodata'] = -999
+    profile['width'] = npa.shape[0]
+    profile['height'] = npa.shape[1]
+    profile['dtype'] = 'float32'
+    profile['blockxsize'] = 128
+    profile['blockysize'] = 128
+
+    with rio.open(dst_filename, 'w', **profile) as dst:
+        dst.write(npa, 1)

@@ -13,4 +13,4 @@ if __name__ == "__main__":
     csc_obj.LoadCaffe(DEM_file, hf, increment_constant, EV_threshold)
     csc_obj.caffe.setDEMCellSize(15)
     csc_obj.LoadSwmm(SWMM_inp)
-    csc_obj.NodeElevationCheck()
+    csc_obj.NodeElvCoordChecks()

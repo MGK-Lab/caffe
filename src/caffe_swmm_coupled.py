@@ -1,6 +1,7 @@
 from .caffe import caffe
 from .swmm import swmm
 import numpy as np
+import sys
 
 
 class csc:
@@ -16,7 +17,7 @@ class csc:
         self.swmm = swmm(SWMM_inp)
         self.swmm.LoadNodes()
 
-    def NodeElevationCheck(self):
+    def NodeElvCoordChecks(self):
         swmm_node_info = self.swmm.nodes_info.to_numpy()
         swmm_node_info = np.column_stack(
             (swmm_node_info[:, 0], swmm_node_info[:, 1],
@@ -26,7 +27,30 @@ class csc:
             swmm_node_info[:, 0] / self.caffe.length) - 1
         swmm_node_info[:, 1] = np.int_(
             swmm_node_info[:, 1] / self.caffe.length) - 1
+
+        err = False
+        i = 0
+        for r in swmm_node_info:
+            if (r[0] < 0 or r[0] > self.caffe.DEMshape[0]
+                    or r[1] < 0 or r[1] > self.caffe.DEMshape[1]):
+                print(self.swmm.node_list[i])
+                err = True
+            i += 1
+        if err:
+            sys.exit(
+                "The above SWMM junctions coordinates are out of the range in the provided DEM")
+
+        err = False
+        i = 0
+        for r in swmm_node_info:
+            if (abs(r[2] - self.caffe.DEM[np.int_(r[0]), np.int_(r[1])])
+                    > 0.01 * self.caffe.DEM[np.int_(r[0]), np.int_(r[1])]):
+                print(self.swmm.node_list[i], " surface Elv != ",
+                      self.caffe.DEM[np.int_(r[0]), np.int_(r[1])])
+                err = True
+            i += 1
+        if err:
+            sys.exit(
+                "The above SWMM junctions surface elevation have > 1% difference with the provided DEM")
+
         print(swmm_node_info)
-        # EVM_np[:, 1] = EVM_np[:, 1] / self.length - 1
-        # for r in EVM_np:
-        #     self.excess_volume_map[r[0], r[1]] = r[2]
