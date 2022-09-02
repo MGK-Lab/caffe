@@ -1,6 +1,11 @@
+from __future__ import division
 import rasterio as rio
 from rasterio.profiles import DefaultGTiffProfile
 import numpy as np
+from matplotlib import cm
+from matplotlib.colors import LightSource
+import matplotlib.pyplot as plt
+import warnings
 
 
 def arraytoRasterIO(array, existingraster, dst_filename):
@@ -48,6 +53,46 @@ def DEMGenerate(npa, dst_filename):
     profile['dtype'] = 'float32'
     profile['blockxsize'] = 128
     profile['blockysize'] = 128
+    # profile['transform'] = rio.Affine(1, 0, 0, 0, 1, 0)
+
+    warnings.filterwarnings(
+        "ignore", category=rio.errors.NotGeoreferencedWarning)
 
     with rio.open(dst_filename, 'w', **profile) as dst:
         dst.write(npa, 1)
+
+
+def InverseWeightedDistance(x, y, v, grid, power):
+    for i in range(grid.shape[0]):
+        for j in range(grid.shape[1]):
+            distance = np.sqrt((x-i)**2+(y-j)**2)
+            if (distance**power).min() == 0:
+                grid[i, j] = v[(distance**power).argmin()]
+            else:
+                total = np.sum(1/(distance**power))
+                grid[i, j] = np.sum(v/(distance**power)/total)
+    return grid
+
+
+def PlotDEM(dem_file, n=10, azdeg=270, altdeg=45, cmp='gist_earth'):
+    dem, mask = DEMRead(dem_file)
+
+    x = np.linspace(0, dem.shape[0], dem.shape[1])
+    y = np.linspace(0, dem.shape[1], dem.shape[0])
+    x, y = np.meshgrid(x, y)
+
+    region = np.s_[0:dem.shape[0]:n, 0:dem.shape[1]:n]
+    x, y, z = x[region], y[region], dem[region]
+
+    fig, ax = plt.subplots(subplot_kw=dict(projection='3d'))
+
+    ls = LightSource(azdeg, altdeg)
+    rgb = ls.shade(z, cmap=cm.get_cmap('gist_earth'),
+                   vert_exag=0.1, blend_mode='soft')
+    ax.plot_surface(x, y, z, rstride=1, cstride=1, facecolors=rgb,
+                    linewidth=0, antialiased=False, shade=False)
+
+    plt.xlim([0, dem.shape[0]])
+    plt.ylim([0, dem.shape[1]])
+    ax.set_box_aspect([np.amax(x), np.amax(y), np.amax(z)])
+    # plt.show()
