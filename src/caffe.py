@@ -1,4 +1,4 @@
-import caffe_core as cc
+import caffe_core
 import numpy as np
 import time
 import sys
@@ -37,10 +37,11 @@ class caffe():
         self.outputs_name = fn
 
     def ExcessVolumeMapArray(self, EVM_np):
-        EVM_np[:, 0] = EVM_np[:, 0] / self.length - 1
-        EVM_np[:, 1] = EVM_np[:, 1] / self.length - 1
+        EVM_np[:, 0] = EVM_np[:, 0] / self.length
+        EVM_np[:, 1] = EVM_np[:, 1] / self.length
         for r in EVM_np:
-            self.excess_volume_map[r[0], r[1]] = r[2]
+            self.excess_volume_map[int(
+                np.ceil(r[0])), int(np.ceil(r[1]))] = r[2]
 
     def setConstants(self, hf, ic, EVt):
         self.setConstants_has_been_called = True
@@ -68,6 +69,7 @@ class caffe():
         # a very large negative number is picked in order to make sure that
         # these cells will never be activated during the simulation
         self.excess_water_column_map[self.mask] = -1*(10**6)
+        self.DEM[self.mask] += 10000
 
         # CAffe_engine works with 1D arrays to provide faster simulations
         self.DEM1d = self.DEM.ravel()
@@ -76,12 +78,14 @@ class caffe():
             self.excess_water_column_map, dtype=np.float32)
         self.water_levels = self.water_levels.ravel()
 
-        cc.CAffe_engine(self.water_levels, self.excess_water_column_map,
-                        self.max_f, np.asarray(self.DEMshape), self.cell_area,
-                        self.excess_total_volume, self.ic, self.hf, self.EVt)
+        caffe_core.CAffe_engine(self.water_levels, self.excess_water_column_map,
+                                self.max_f, np.asarray(
+                                    self.DEMshape), self.cell_area,
+                                self.excess_total_volume, self.ic, self.hf, self.EVt)
 
         self.water_levels = self.water_levels.reshape(self.DEMshape)
-        self.water_levels[self.mask] = 0
+        # self.water_levels[self.mask] = 0
+        self.DEM[self.mask] -= 10000
 
         self.water_depths = self.water_levels - self.DEM
         self.water_depths[self.mask] = 0

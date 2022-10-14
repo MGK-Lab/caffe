@@ -16,7 +16,7 @@ if __name__ == "__main__":
     # to set DEM cell size (the default is 1)
     sim.setDEMCellSize(1)
     # to set excess volume map using coordinate
-    sim.ExcessVolumeMapArray(np.array([[119, 704, 8000]]))
+    sim.ExcessVolumeMapArray(np.array([[499, 499, 15000]]))
     sim.RunSimulation()
     sim.setOutputPath("./tests/")
     sim.CloseSimulation()

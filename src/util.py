@@ -15,6 +15,8 @@ def arraytoRasterIO(array, existingraster, dst_filename):
 
     naip_meta['count'] = 1
     naip_meta['nodata'] = -999
+    warnings.filterwarnings(
+        "ignore", category=rio.errors.NotGeoreferencedWarning)
 
     # write your the ndvi raster object
     with rio.open(dst_filename, 'w', **naip_meta) as dst:
@@ -24,13 +26,16 @@ def arraytoRasterIO(array, existingraster, dst_filename):
 def DEMRead(dem_file):
     """this function is used to read digital elevation model (DEM file) of
     the 1st layer (band = 1)"""
+    warnings.filterwarnings(
+        "ignore", category=rio.errors.NotGeoreferencedWarning)
+
     src = rio.open(dem_file)
     band = 1
     dem_array = src.read(band)
     msk = src.read_masks(band)
 
     # unrealistic height to invalid data
-    dem_array[msk == 0] = 100000
+    # dem_array[msk == 0] = 100000
     DEM = np.array(dem_array, dtype=np.float32)
 
     mask = np.zeros_like(dem_array, dtype=bool)
@@ -74,7 +79,7 @@ def InverseWeightedDistance(x, y, v, grid, power):
     return grid
 
 
-def PlotDEM(dem_file, n=10, azdeg=270, altdeg=45, cmp='gist_earth'):
+def PlotDEM3d(dem_file, n=10, azdeg=270, altdeg=45, cmp_name='gist_earth'):
     dem, mask = DEMRead(dem_file)
 
     x = np.linspace(0, dem.shape[0], dem.shape[1])
@@ -87,12 +92,29 @@ def PlotDEM(dem_file, n=10, azdeg=270, altdeg=45, cmp='gist_earth'):
     fig, ax = plt.subplots(subplot_kw=dict(projection='3d'))
 
     ls = LightSource(azdeg, altdeg)
-    rgb = ls.shade(z, cmap=cm.get_cmap('gist_earth'),
+    rgb = ls.shade(z, cmap=cm.get_cmap(cmp_name),
                    vert_exag=0.1, blend_mode='soft')
-    ax.plot_surface(x, y, z, rstride=1, cstride=1, facecolors=rgb,
+
+# I do not know why I should swap x and y to correctly illustrate the plot
+    ax.plot_surface(y, x, z, rstride=1, cstride=1, facecolors=rgb,
                     linewidth=0, antialiased=False, shade=False)
 
-    plt.xlim([0, dem.shape[0]])
-    plt.ylim([0, dem.shape[1]])
-    ax.set_box_aspect([np.amax(x), np.amax(y), np.amax(z)])
+    plt.xlim([0, dem.shape[1]])
+    plt.ylim([0, dem.shape[0]])
+    ax.set_box_aspect([np.amax(y), np.amax(x), np.amax(z)])
+    plt.xlabel('X Axis')
+    plt.ylabel('Y Axis')
+    # plt.show()
+
+
+def PlotDEM2d(dem_file, cmp_name='gist_earth'):
+    dem, mask = DEMRead(dem_file)
+
+    plt.imshow(dem.T, origin='lower', interpolation='nearest', cmap=cmp_name)
+    plt.xlim(0, dem.shape[0])
+    plt.ylim(0, dem.shape[1])
+    plt.grid()
+
+    plt.xlabel('X Axis')
+    plt.ylabel('Y Axis')
     # plt.show()
