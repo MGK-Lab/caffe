@@ -79,7 +79,7 @@ def InverseWeightedDistance(x, y, v, grid, power):
     return grid
 
 
-def PlotDEM3d(dem_file, n=10, azdeg=270, altdeg=45, cmp_name='gist_earth'):
+def PlotDEM3d(dem_file, n=10, azdeg=290, altdeg=80, cmp_name='gist_earth'):
     dem, mask = DEMRead(dem_file)
 
     x = np.linspace(0, dem.shape[0], dem.shape[1])
@@ -90,6 +90,7 @@ def PlotDEM3d(dem_file, n=10, azdeg=270, altdeg=45, cmp_name='gist_earth'):
     x, y, z = x[region], y[region], dem[region]
 
     fig, ax = plt.subplots(subplot_kw=dict(projection='3d'))
+    ax.view_init(elev=altdeg, azim=azdeg)
 
     ls = LightSource(azdeg, altdeg)
     rgb = ls.shade(z, cmap=cm.get_cmap(cmp_name),

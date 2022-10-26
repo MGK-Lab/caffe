@@ -17,6 +17,7 @@ class caffe():
         # to initialise a CAffe model
         self.length = 1
         self.cell_area = 1
+        self.vol_cutoff = 0.1
         self.setConstants_has_been_called = False
         self.water_levels = np.copy(self.DEM).astype(np.float32)
         self.excess_volume_map = np.zeros_like(self.DEM, dtype=np.float32)
@@ -32,6 +33,9 @@ class caffe():
 
     def setOutputPath(self, fp):
         self.outputs_path = fp
+
+    def setSpreadVolumeCutoff(self, vc):
+        self.vol_cutoff = vc
 
     def setOutputName(self, fn):
         self.outputs_name = fn
@@ -81,7 +85,8 @@ class caffe():
         caffe_core.CAffe_engine(self.water_levels, self.excess_water_column_map,
                                 self.max_f, np.asarray(
                                     self.DEMshape), self.cell_area,
-                                self.excess_total_volume, self.ic, self.hf, self.EVt)
+                                self.excess_total_volume, self.ic, self.hf,
+                                self.EVt, self.vol_cutoff)
 
         self.water_levels = self.water_levels.reshape(self.DEMshape)
         # self.water_levels[self.mask] = 0

@@ -16,21 +16,17 @@ class swmm:
     def LoadNodes(self):
         self.nodes = Nodes(self.sim)
 
-        c = ["Inv_Elv", "F_Depth"]
+        c = ["Inv_Elv", "F_Depth", "Outfall"]
         self.nodes_info = pd.DataFrame(columns=c)
 
         for n in self.nodes:
             self.nodes_info.loc[n.nodeid] = pd.DataFrame(
-                [[n.invert_elevation, n.full_depth]], columns=c).loc[0]
+                [[n.invert_elevation, n.full_depth, n.is_outfall()]], columns=c).loc[0]
 
         self.nodes_info = pd.concat(
             [self._hymo_inp.coordinates, self.nodes_info], axis=1)
 
         self.node_list = list(self.nodes_info.index.values)
-
-    def MapInfo(self, dim, unit):
-        # should be first implemented in hymo
-        pass
 
     def InteractionInterval(self, sec):
         self.sim.step_advance(sec)
@@ -55,6 +51,15 @@ class swmm:
         i = 0
         for n in self.node_list:
             TI[i] = self.nodes[n].total_inflow
+            i += 1
+
+        return TI
+
+    def getNodesFlooding(self):
+        TI = np.zeros(len(self.node_list))
+        i = 0
+        for n in self.node_list:
+            TI[i] = self.nodes[n].flooding
             i += 1
 
         return TI

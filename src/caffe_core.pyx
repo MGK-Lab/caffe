@@ -18,7 +18,8 @@ cpdef CAffe_engine(np.ndarray[np.float32_t, ndim = 1] water_levels,
                    double total_vol,
                    double increment_constant,
                    double hf,
-                   double EV_threshold):
+                   double EV_threshold,
+                   double vol_cutoff):
 
     cdef double friction_head_loss = 0
     cdef double minlevels, maxlevels, level_change,increase, deltav_total,\
@@ -106,6 +107,7 @@ cpdef CAffe_engine(np.ndarray[np.float32_t, ndim = 1] water_levels,
                             extra_volume_map[i + 1] += levels_r / deltav_total * extra_volume_map[i]
                             extra_volume_map[i + row_len] += levels_d / deltav_total * extra_volume_map[i]
                             extra_volume_map[i - 1] += levels_l / deltav_total * extra_volume_map[i]
+
                             extra_volume_map[i] = 0
 
                     elif minlevels > 0.:
@@ -172,7 +174,7 @@ cpdef CAffe_engine(np.ndarray[np.float32_t, ndim = 1] water_levels,
             if iteration % 2000== 0:
                 printf("iteration %f\n", iteration*1.)
                 printf("\tvolume spread [m3] = %f\n", volume_spread * cell_area)
-            if total_vol - volume_spread * cell_area < 5:
+            if total_vol - volume_spread * cell_area < vol_cutoff:
                 terminate = 1
 
 
