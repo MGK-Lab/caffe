@@ -86,25 +86,18 @@ class csc:
 
         self.swmm.CloseSimulation()
 
-        # def RunMulti_SWMMtoCaffe(self):
-        #     origin_name = self.caffe.outputs_name
-        #     water_levels = self.caffe.water_levels
-        #
-        #     for step in self.swmm.sim:
-        #         tmp = self.swmm.getNodesFlooding()
-        #         if (np.sum(tmp) > 0):
-        #             floodvolume = np.column_stack((self.swmm_node_info[:, 0:2],
-        #                                            np.transpose(tmp)*self.IntTimeStep))
-        #
-        #             caffe_tmp = caffe(self.DEM_file)
-        #             caffe_tmp = deepcopy(self.caffe)
-        #             caffe_tmp.water_levels = water_levels
-        #             caffe_tmp.ExcessVolumeMapArray(floodvolume)
-        #             caffe_tmp.outputs_name = origin_name + \
-        #                 "_" + str(self.swmm.sim.current_time)
-        #             caffe_tmp.RunSimulation()
-        #             water_levels = self.caffe.water_levels
-        #             caffe_tmp.CloseSimulation()
-        #             del caffe_tmp
-        #
-        #     self.swmm.CloseSimulation()
+    def Run_CaffetoSWMM(self):
+        origin_name = self.caffe.outputs_name
+
+        for step in self.swmm.sim:
+            tmp = self.swmm.getNodesFlooding()
+            if (np.sum(tmp) > 0):
+                floodvolume = np.column_stack((self.swmm_node_info[:, 0:2],
+                                               np.transpose(tmp)*self.IntTimeStep))
+                self.caffe.ExcessVolumeMapArray(floodvolume)
+                self.caffe.outputs_name = origin_name + \
+                    "_" + str(self.swmm.sim.current_time)
+                self.caffe.RunSimulation()
+                self.caffe.CloseSimulation()
+
+        self.swmm.CloseSimulation()

@@ -5,7 +5,9 @@ import numpy as np
 from matplotlib import cm
 from matplotlib.colors import LightSource
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 import warnings
+import os
 
 
 def arraytoRasterIO(array, existingraster, dst_filename):
@@ -31,14 +33,11 @@ def DEMRead(dem_file):
 
     src = rio.open(dem_file)
     band = 1
-    dem_array = src.read(band)
+    DEM = src.read(band)
     msk = src.read_masks(band)
+    DEM = DEM.astype(np.double)
 
-    # unrealistic height to invalid data
-    # dem_array[msk == 0] = 100000
-    DEM = np.array(dem_array, dtype=np.float32)
-
-    mask = np.zeros_like(dem_array, dtype=bool)
+    mask = np.zeros_like(DEM, dtype=bool)
     mask[msk == 0] = True
     mask[0, :] = True
     mask[-1, :] = True
@@ -119,3 +118,37 @@ def PlotDEM2d(dem_file, cmp_name='gist_earth'):
     plt.xlabel('X Axis')
     plt.ylabel('Y Axis')
     # plt.show()
+
+
+def AnimateDEMs(path, name, fps=5, n=10, azdeg=290, altdeg=80, cmp_name='gist_earth'):
+
+    files = [os.path.join(dirpath, f) for (dirpath, dirnames, filenames)
+             in os.walk(path) for f in filenames]
+    files.sort()
+
+    fig, ax = plt.subplots(subplot_kw=dict(projection='3d'))
+    ax.view_init(elev=altdeg, azim=azdeg)
+    ls = LightSource(azdeg, altdeg)
+
+    images = []
+
+    for file in files:
+        dem, mask = DEMRead(file)
+
+        x = np.linspace(0, dem.shape[0], dem.shape[1])
+        y = np.linspace(0, dem.shape[1], dem.shape[0])
+        x, y = np.meshgrid(x, y)
+
+        region = np.s_[0:dem.shape[0]:n, 0:dem.shape[1]:n]
+        x, y, z = x[region], y[region], dem[region]
+
+        rgb = ls.shade(z, cmap=cm.get_cmap(cmp_name),
+                       vert_exag=0.1, blend_mode='soft')
+
+        image = ax.plot_surface(y, x, z, rstride=1, cstride=1, facecolors=rgb,
+                                linewidth=0, antialiased=False, shade=False)
+        images.append([image])
+
+    ani = animation.ArtistAnimation(fig, images)
+    writergif = animation.PillowWriter(fps=fps)
+    ani.save(name, writer=writergif)

@@ -20,6 +20,6 @@ if __name__ == "__main__":
 
     csc_obj.NodeElvCoordChecks()
     csc_obj.InteractionInterval(600)
-    csc_obj.caffe.setSpreadVolumeCutoff(0.01)
+    csc_obj.caffe.setSpreadVolumeCutoff(0.001)
     # csc_obj.RunOne_SWMMtoCaffe()
     csc_obj.RunMulti_SWMMtoCaffe()
