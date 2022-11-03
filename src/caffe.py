@@ -81,41 +81,26 @@ class caffe():
             print("total volume to be spread (m3) =", self.excess_total_volume)
             self.excess_water_column_map = self.excess_volume_map / self.cell_area
 
-        # For masked areas (i.e. borders of the calculation domain),
-        # a very large negative number is picked in order to make sure that
-        # these cells will never be activated during the simulation
-        # self.excess_water_column_map[self.mask] = -1*(10**6)
-        # self.DEM[self.mask] += 10000
-
         # CAffe_engine works with 1D arrays to provide faster simulations
         self.DEM1d = self.DEM.ravel()
+        self.mask1d = self.mask.ravel()
         self.excess_water_column_map = self.excess_water_column_map.ravel()
         self.max_f = np.zeros_like(
             self.excess_water_column_map, dtype=np.double)
         self.water_levels = self.water_levels.ravel()
 
-        caffe_core.CAffe_engine(self.water_levels, self.excess_water_column_map,
-                                self.max_f, np.asarray(
-                                    self.DEMshape), self.cell_area,
-                                self.excess_total_volume, self.ic, self.hf,
-                                self.EVt, self.vol_cutoff)
+        caffe_core.CAffe_engine(self.water_levels, self.mask1d,
+                                self.excess_water_column_map,
+                                self.max_f, np.asarray(self.DEMshape),
+                                self.cell_area, self.ic, self.hf, self.EVt,
+                                self.vol_cutoff)
 
         self.water_levels = self.water_levels.reshape(self.DEMshape)
-        # self.water_levels[self.mask] = 0
-        # self.DEM[self.mask] -= 10000
-
         self.water_depths = self.water_levels - self.DEM
-        # self.water_depths[self.mask] = 0
-
         self.max_water_levels = self.max_f.reshape(self.DEMshape)
         self.max_water_levels = np.maximum(
             self.water_levels, self.max_water_levels)
-        # self.max_water_levels[self.mask] = 0
-
         self.max_water_depths = self.max_water_levels - self.DEM
-        # self.max_water_depths[self.mask] = 0
-
-        # self.DEM[self.mask] = 0
 
         print("\nSimulation finished in", (time.time() - self.begining),
               "seconds")

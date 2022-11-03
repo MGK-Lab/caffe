@@ -11,11 +11,11 @@ from libc.stdio cimport printf
 
 
 cpdef CAffe_engine(np.ndarray[np.double_t, ndim = 1] water_levels,
+                   np.ndarray[np.uint8_t, ndim = 1, cast=True] mask,
                    np.ndarray[np.double_t, ndim = 1] extra_volume_map,
                    np.ndarray[np.double_t, ndim = 1] max_f,
                    np.ndarray[np.int64_t, ndim = 1] DEMshape,
                    double cell_area,
-                   double total_vol,
                    double increment_constant,
                    double hf,
                    double EV_threshold,
@@ -30,12 +30,13 @@ cpdef CAffe_engine(np.ndarray[np.double_t, ndim = 1] water_levels,
     iteration = 1
     cdef double start_t = time.time()
 
-    # the first and last row are mask cells
-    cdef int loop_beg = DEMshape[1] + 1
-    cdef int loop_end = (DEMshape[0] - 1) * DEMshape[1]
+    cdef int loop_beg = 0
+    cdef int loop_end = water_levels.size - 1
     cdef int row_len = DEMshape[1]
 
-    cdef double volume_spread = 0. #to measure how much of extra_volume_map is spread
+    cdef double volume_spread = 0.
+    cdef double total_vol = np.sum(extra_volume_map) * cell_area
+
     with nogil:
       while terminate == 0:
           terminate = 1 # exit loop when terminate == 1 (default)
@@ -43,7 +44,7 @@ cpdef CAffe_engine(np.ndarray[np.double_t, ndim = 1] water_levels,
           for i in range(loop_beg, loop_end):
               # Rule 0 : do nothing
               # if the central cell has no excess volume, continue the loop
-              if extra_volume_map[i] > EV_threshold:
+              if (extra_volume_map[i] > EV_threshold and mask[i]==False):
                   terminate = 0
                   # estimate water level difference between central and
                   # neighbouring cells to find the coresponbding rule
@@ -172,8 +173,7 @@ cpdef CAffe_engine(np.ndarray[np.double_t, ndim = 1] water_levels,
 
           if iteration % 2000== 0:
               printf("iteration %i\n", iteration)
-              printf("\tvolume spread [m3] = %.3f\n",
-               volume_spread * cell_area)
+              printf("\tvolume spread [m3] = %.3f\n", volume_spread * cell_area)
 
           if total_vol - volume_spread * cell_area < vol_cutoff:
               printf("iteration %i\n", iteration)
