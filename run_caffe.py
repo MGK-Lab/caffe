@@ -18,6 +18,7 @@ if __name__ == "__main__":
     sim.setSpreadVolumeCutoff(0.0001)
     # to set excess volume map using coordinate
     sim.ExcessVolumeMapArray(np.array([[499, 499, 15000]]))
+    sim.OpenBCMapArray(np.array([[300, 300]]))
     sim.RunSimulation()
     sim.setOutputPath("./tests/")
     sim.CloseSimulation()

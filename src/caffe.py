@@ -11,16 +11,18 @@ class caffe():
         print("\n", time.ctime(), "\n")
 
         self.dem_file = dem_file
-        self.DEM, self.mask = util.DEMRead(dem_file)
+        self.DEM, self.ClosedBC = util.DEMRead(dem_file)
         self.DEMshape = self.DEM.shape
 
         # to initialise a CAffe model
+        self.BCtol = 1e6
         self.length = 1
         self.cell_area = 1
         self.vol_cutoff = 0.1
         self.setConstants_has_been_called = False
         self.water_levels = np.copy(self.DEM).astype(np.double)
         self.excess_volume_map = np.zeros_like(self.DEM, dtype=np.double)
+        self.OpenBC = np.zeros_like(self.DEM, dtype=np.bool)
         self.user_waterdepth_file = False
         self.outputs_path = "./"
         name = dem_file.split('.')
@@ -47,6 +49,26 @@ class caffe():
         for r in EVM_np:
             self.excess_volume_map[int(
                 np.ceil(r[0])), int(np.ceil(r[1]))] = r[2]
+
+    def OpenBCMapArray(self, OBCM_np):
+        OBCM_np[:, 0] = OBCM_np[:, 0] / self.length
+        OBCM_np[:, 1] = OBCM_np[:, 1] / self.length
+        for r in OBCM_np:
+            self.OpenBC[int(np.ceil(r[0])), int(np.ceil(r[1]))] = True
+
+    def ClosedBCMapArray(self, CBCM_np):
+        CBCM_np[:, 0] = CBCM_np[:, 0] / self.length
+        CBCM_np[:, 1] = CBCM_np[:, 1] / self.length
+        for r in CBCM_np:
+            self.ClosedBC[int(np.ceil(r[0])), int(np.ceil(r[1]))] = True
+
+    def SetBCs(self):
+        self.water_levels[self.ClosedBC] += self.BCtol
+        self.water_levels[self.OpenBC] -= self.BCtol
+
+    def ResetBCs(self):
+        self.water_levels[self.ClosedBC] -= self.BCtol
+        self.water_levels[self.OpenBC] += self.BCtol
 
     def LoadInitialExcessWaterDepthfile(self, wd_file):
         self.user_waterdepth_file = True
@@ -82,52 +104,60 @@ class caffe():
             self.excess_water_column_map = self.excess_volume_map / self.cell_area
 
         # CAffe_engine works with 1D arrays to provide faster simulations
-        self.DEM1d = self.DEM.ravel()
-        self.mask1d = self.mask.ravel()
+        self.SetBCs()
+        self.ClosedBC = self.ClosedBC.ravel()
         self.excess_water_column_map = self.excess_water_column_map.ravel()
-        self.max_f = np.zeros_like(
-            self.excess_water_column_map, dtype=np.double)
         self.water_levels = self.water_levels.ravel()
 
-        caffe_core.CAffe_engine(self.water_levels, self.mask1d,
+        self.max_f = np.zeros_like(
+            self.excess_water_column_map, dtype=np.double)
+
+        caffe_core.CAffe_engine(self.water_levels, self.ClosedBC,
                                 self.excess_water_column_map,
                                 self.max_f, np.asarray(self.DEMshape),
                                 self.cell_area, self.ic, self.hf, self.EVt,
                                 self.vol_cutoff)
 
+        self.ClosedBC = self.ClosedBC.reshape(self.DEMshape)
         self.water_levels = self.water_levels.reshape(self.DEMshape)
+        self.ResetBCs()
         self.water_depths = self.water_levels - self.DEM
         self.max_water_levels = self.max_f.reshape(self.DEMshape)
         self.max_water_levels = np.maximum(
             self.water_levels, self.max_water_levels)
         self.max_water_depths = self.max_water_levels - self.DEM
+        self.excess_water_column_map = self.excess_water_column_map.reshape(
+            self.DEMshape)
 
         print("\nSimulation finished in", (time.time() - self.begining),
               "seconds")
 
     def Report(self):
         print("\n")
-        print("water depth (min, max):     ", np.min(
+        print("water depth (min, max):       ", np.min(
             self.water_depths), ", ", np.max(self.water_depths))
 
-        print("max water depth (min, max): ", np.min(self.max_water_depths),
+        print("max water depth (min, max):   ", np.min(self.max_water_depths),
               ", ", np.max(self.max_water_depths))
 
-        print("water level (min, max):     ", np.min(
+        print("water level (min, max):       ", np.min(
             self.water_levels), ", ", np.max(self.water_levels))
 
-        print("max water level (min, max): ", np.min(self.max_water_levels),
+        print("max water level (min, max):   ", np.min(self.max_water_levels),
               ", ", np.max(self.max_water_levels))
 
-        print("Sum spreaded water volume:  ", np.sum(
+        print("Sum of total spreaded volume: ", np.sum(
             self.water_depths) * self.cell_area)
-        self.excess_water_column_map = self.excess_water_column_map.reshape(
-            self.DEMshape)
-        # self.excess_water_column_map[self.mask] += 1 * (10 ** 6)
-        print("Total volume to out:        ", np.sum(
-            self.excess_water_column_map[self.mask]) * self.cell_area)
-        print("Left excess volume:         ", np.sum(
-            self.excess_water_column_map[self.mask == False]) * self.cell_area)
+
+        print("Sum of non-spreaded volume:   ", np.sum(
+            self.excess_water_column_map[self.ClosedBC == False])
+            * self.cell_area)
+
+        print("Left volume at Closed BC:     ", np.sum(
+            self.excess_water_column_map[self.ClosedBC]) * self.cell_area)
+
+        print("Left volume at Open BC:       ", np.sum(
+            self.water_depths[self.OpenBC]) * self.cell_area)
 
         fn = self.outputs_path + self.outputs_name + '_wl.tif'
         util.arraytoRasterIO(self.water_levels, self.dem_file, fn)
