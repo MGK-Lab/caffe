@@ -28,10 +28,13 @@ class caffe():
         name = dem_file.split('.')
         name = name[1].split('/')
         self.outputs_name = name[-1] + "_out"
+        self.CBC_cells = np.array([])
+        self.OBC_cells = np.array([])
 
     def CloseSimulation(self):
         print("\n .....closing and reporting the CA-ffé simulation.....")
-        self.Report()
+        self.ReportScreen()
+        self.ReportFile()
         print("\n", time.ctime(), "\n")
 
     def setOutputPath(self, fp):
@@ -42,37 +45,6 @@ class caffe():
 
     def setOutputName(self, fn):
         self.outputs_name = fn
-
-    def ExcessVolumeMapArray(self, EVM_np):
-        EVM_np[:, 0] = EVM_np[:, 0] / self.length
-        EVM_np[:, 1] = EVM_np[:, 1] / self.length
-        for r in EVM_np:
-            self.excess_volume_map[int(
-                np.ceil(r[0])), int(np.ceil(r[1]))] = r[2]
-
-    def OpenBCMapArray(self, OBCM_np):
-        OBCM_np[:, 0] = OBCM_np[:, 0] / self.length
-        OBCM_np[:, 1] = OBCM_np[:, 1] / self.length
-        for r in OBCM_np:
-            self.OpenBC[int(np.ceil(r[0])), int(np.ceil(r[1]))] = True
-
-    def ClosedBCMapArray(self, CBCM_np):
-        CBCM_np[:, 0] = CBCM_np[:, 0] / self.length
-        CBCM_np[:, 1] = CBCM_np[:, 1] / self.length
-        for r in CBCM_np:
-            self.ClosedBC[int(np.ceil(r[0])), int(np.ceil(r[1]))] = True
-
-    def SetBCs(self):
-        self.water_levels[self.ClosedBC] += self.BCtol
-        self.water_levels[self.OpenBC] -= self.BCtol
-
-    def ResetBCs(self):
-        self.water_levels[self.ClosedBC] -= self.BCtol
-        self.water_levels[self.OpenBC] += self.BCtol
-
-    def LoadInitialExcessWaterDepthfile(self, wd_file):
-        self.user_waterdepth_file = True
-        self.excess_volume_map, tmp = util.DEMRead(wd_file)
 
     def setConstants(self, hf, ic, EVt):
         self.setConstants_has_been_called = True
@@ -85,6 +57,67 @@ class caffe():
     def setDEMCellSize(self, length):
         self.length = length
         self.cell_area = length**2
+
+    def ExcessVolumeMapArray(self, EVM_np, add=False):
+        EVM_np[:, 0] = EVM_np[:, 0] / self.length
+        EVM_np[:, 1] = EVM_np[:, 1] / self.length
+        for r in EVM_np:
+            if add:
+                self.excess_volume_map[int(
+                    np.ceil(r[0])), int(np.ceil(r[1]))] += r[2]
+            else:
+                self.excess_volume_map[int(
+                    np.ceil(r[0])), int(np.ceil(r[1]))] = r[2]
+
+    def LoadInitialExcessWaterDepthFile(self, wd_file):
+        self.user_waterdepth_file = True
+        self.excess_volume_map, tmp = util.DEMRead(wd_file)
+
+    def LoadInitialExcessWaterDepthArray(self, wd_np):
+        self.user_waterdepth_file = True
+        self.excess_volume_map = wd_np
+
+    def OpenBCMapArray(self, OBCM_np):
+        self.OBC_cells = np.zeros_like(OBCM_np, dtype=np.int)
+        OBCM_np[:, 0] = OBCM_np[:, 0] / self.length
+        OBCM_np[:, 1] = OBCM_np[:, 1] / self.length
+
+        i = 0
+        for r in OBCM_np:
+            self.OpenBC[int(np.ceil(r[0])), int(np.ceil(r[1]))] = True
+            self.OBC_cells[i, 0] = int(np.ceil(r[0]))
+            self.OBC_cells[i, 1] = int(np.ceil(r[1]))
+            i += 1
+
+    def ClosedBCMapArray(self, CBCM_np):
+        self.CBC_cells = np.zeros_like(CBCM_np, dtype=np.int)
+        CBCM_np[:, 0] = CBCM_np[:, 0] / self.length
+        CBCM_np[:, 1] = CBCM_np[:, 1] / self.length
+
+        i = 0
+        for r in CBCM_np:
+            self.ClosedBC[int(np.ceil(r[0])), int(np.ceil(r[1]))] = True
+            self.CBC_cells[i, 0] = int(np.ceil(r[0]))
+            self.CBC_cells[i, 1] = int(np.ceil(r[1]))
+            i += 1
+
+    def SetBCs(self):
+        self.water_levels[self.ClosedBC] += self.BCtol
+        self.water_levels[self.OpenBC] -= self.BCtol
+
+    def ResetBCs(self):
+        self.water_levels[self.ClosedBC] -= self.BCtol
+        self.water_levels[self.OpenBC] += self.BCtol
+
+    def Reset_WL_EVM(self):
+        self.water_levels = np.copy(self.DEM).astype(np.double)
+        self.excess_volume_map = np.zeros_like(self.DEM, dtype=np.double)
+
+        for r in self.CBC_cells:
+            self.ClosedBC[r[0], r[1]] = False
+
+        for r in self.OBC_cells:
+            self.OpenBC[r[0], r[1]] = False
 
     def RunSimulation(self):
         self.begining = time.time()
@@ -132,7 +165,7 @@ class caffe():
         print("\nSimulation finished in", (time.time() - self.begining),
               "seconds")
 
-    def Report(self):
+    def ReportScreen(self):
         print("\n")
         print("water depth (min, max):       ", np.min(
             self.water_depths), ", ", np.max(self.water_depths))
@@ -159,6 +192,7 @@ class caffe():
         print("Left volume at Open BC:       ", np.sum(
             self.water_depths[self.OpenBC]) * self.cell_area)
 
+    def ReportFile(self):
         fn = self.outputs_path + self.outputs_name + '_wl.tif'
         util.arraytoRasterIO(self.water_levels, self.dem_file, fn)
 

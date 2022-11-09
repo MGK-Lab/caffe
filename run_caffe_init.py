@@ -18,7 +18,7 @@ if __name__ == "__main__":
     # to set DEM cell size (the default is 1)
     sim.setDEMCellSize(1)
     # to set excess volume map using coordinate
-    sim.LoadInitialExcessWaterDepthfile(input_WD_file)
+    sim.LoadInitialExcessWaterDepthFile(input_WD_file)
     sim.setSpreadVolumeCutoff(0.0001)
     sim.RunSimulation()
     sim.setOutputName("test_loadWD")

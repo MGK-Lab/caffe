@@ -2,6 +2,9 @@ from .caffe import caffe
 from .swmm import swmm
 import numpy as np
 import sys
+from colorama import Fore, Back, Style
+import src.util as ut
+import matplotlib.pyplot as plt
 
 
 class csc:
@@ -86,18 +89,72 @@ class csc:
 
         self.swmm.CloseSimulation()
 
-    def Run_CaffetoSWMM(self):
+    def Run_Caffe_BD_SWMM(self):
+
         origin_name = self.caffe.outputs_name
+        First_Step = True
+        last_wd = np.array([])
+
+        print(Fore.RED + "Starts running SWMM" + Style.RESET_ALL + "\n\n")
 
         for step in self.swmm.sim:
-            tmp = self.swmm.getNodesFlooding()
-            if (np.sum(tmp) > 0):
+            print(Fore.GREEN + "SWMM @ "
+                  + str(self.swmm.sim.current_time) + Style.RESET_ALL + "\n")
+
+            if First_Step:
+                First_Step = False
+            else:
+                self.caffe.Reset_WL_EVM()
+                self.caffe.LoadInitialExcessWaterDepthArray(last_wd)
+
+            flooded_nodes_flowrates = np.transpose(
+                self.swmm.getNodesFlooding()) * self.IntTimeStep
+            tot_flood = np.sum(flooded_nodes_flowrates)
+            if tot_flood > 0:
+                print(Fore.RED + "SWMM surcharged "
+                      + str(tot_flood) + Style.RESET_ALL + "\n")
                 floodvolume = np.column_stack((self.swmm_node_info[:, 0:2],
-                                               np.transpose(tmp)*self.IntTimeStep))
-                self.caffe.ExcessVolumeMapArray(floodvolume)
+                                               flooded_nodes_flowrates
+                                               / self.caffe.cell_area))
+                self.caffe.ExcessVolumeMapArray(floodvolume, True)
+
+            nonflooded_nodes = self.swmm_node_info[np.logical_not(
+                    flooded_nodes_flowrates > 0), 0:2]
+            self.caffe.OpenBCMapArray(nonflooded_nodes)
+
+            if (tot_flood > 0 or np.sum(self.caffe.excess_volume_map) > 0):
+                self.caffe.RunSimulation()
+                self.caffe.ReportScreen()
+
+                last_wd = self.caffe.water_depths
+                if (np.sum(last_wd) > 0):
+                    j = 0
+                    k = 0
+                    inflow = np.zeros(self.swmm_node_info.shape[0])
+                    for i in flooded_nodes_flowrates:
+                        if i > 0:
+                            inflow[j] = 0
+                        else:
+                            inflow[j] = last_wd[int(self.caffe.OBC_cells[k, 0]), int(
+                                self.caffe.OBC_cells[k, 1])] * self.caffe.cell_area / self.IntTimeStep
+                            last_wd[int(self.caffe.OBC_cells[k, 0]), int(
+                                self.caffe.OBC_cells[k, 1])] = 0.0
+                            k += 1
+                        j += 1
+                    self.swmm.setNodesInflow(inflow)
+                    print(Fore.BLUE + "\nCA-ffé drained "
+                          + str(np.sum(inflow) * self.IntTimeStep) + Style.RESET_ALL + "\n")
+
+                #For reporting purpose, WD changed. BTW, it will be reseted in the next step
+                self.caffe.water_depths = last_wd
                 self.caffe.outputs_name = origin_name + \
                     "_" + str(self.swmm.sim.current_time)
-                self.caffe.RunSimulation()
-                self.caffe.CloseSimulation()
+                self.caffe.ReportFile()
+
+                # file = self.caffe.outputs_path + self.caffe.outputs_name + "_wd.tif"
+                # ut.PlotDEM3d(file, 1)
+                # plt.show()
+            else:
+                last_wd = np.zeros_like(self.caffe.DEM, dtype=np.double)
 
         self.swmm.CloseSimulation()
