@@ -1,6 +1,5 @@
 import numpy as np
 import src.util as ut
-import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
 

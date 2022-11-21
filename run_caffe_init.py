@@ -1,6 +1,4 @@
 from src.caffe import caffe
-import numpy as np
-
 
 if __name__ == "__main__":
 

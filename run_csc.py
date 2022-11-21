@@ -1,5 +1,4 @@
 from src.caffe_swmm_coupled import csc
-import numpy as np
 
 if __name__ == "__main__":
 

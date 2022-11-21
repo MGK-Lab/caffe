@@ -1,6 +1,7 @@
 import src.util as ut
 import numpy as np
 import matplotlib.pyplot as plt
+import src.visual as vs
 
 
 if __name__ == "__main__":
@@ -22,5 +23,5 @@ if __name__ == "__main__":
     print("Avg difference: ", np.mean(diff))
     print("Sum difference: ", np.sum(diff))
 
-    ut.PlotDEM3d(diff_file, 1)
+    vs.PlotDEM3d(diff_file, 1)
     plt.show()
