@@ -3,8 +3,6 @@ from .swmm import swmm
 import numpy as np
 import sys
 from colorama import Fore, Back, Style
-import src.util as ut
-import matplotlib.pyplot as plt
 
 
 class csc:
@@ -146,14 +144,12 @@ class csc:
                           + str(np.sum(inflow) * self.IntTimeStep) + Style.RESET_ALL + "\n")
 
                 #For reporting purpose, WD changed. BTW, it will be reseted in the next step
-                self.caffe.water_depths = last_wd
-                self.caffe.outputs_name = origin_name + \
-                    "_" + str(self.swmm.sim.current_time)
-                self.caffe.ReportFile()
+                if np.sum(last_wd) > 0:
+                    self.caffe.water_depths = last_wd
+                    self.caffe.outputs_name = origin_name + \
+                        "_" + str(self.swmm.sim.current_time)
+                    self.caffe.ReportFile()
 
-                # file = self.caffe.outputs_path + self.caffe.outputs_name + "_wd.tif"
-                # ut.PlotDEM3d(file, 1)
-                # plt.show()
             else:
                 last_wd = np.zeros_like(self.caffe.DEM, dtype=np.double)
 

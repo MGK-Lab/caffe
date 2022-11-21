@@ -3,6 +3,7 @@ import numpy as np
 import time
 import sys
 from . import util
+import os
 
 
 class caffe():
@@ -193,6 +194,9 @@ class caffe():
             self.water_depths[self.OpenBC]) * self.cell_area)
 
     def ReportFile(self):
+        if not os.path.exists(self.outputs_path):
+            os.mkdir(self.outputs_path)
+
         fn = self.outputs_path + self.outputs_name + '_wl.tif'
         util.arraytoRasterIO(self.water_levels, self.dem_file, fn)
 
