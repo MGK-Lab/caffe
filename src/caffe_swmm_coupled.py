@@ -8,6 +8,7 @@ from colorama import Fore, Back, Style
 class csc:
     def __init__(self):
         print("\n .....Initiating 2D-1D modelling using coupled SWMM & CA-ffé.....")
+        self.g = 9.81
 
     def LoadCaffe(self, DEM_file, hf, increment_constant, EV_threshold):
         self.caffe = caffe(DEM_file)
@@ -133,13 +134,15 @@ class csc:
                         if i > 0:
                             inflow[j] = 0
                         else:
-                            inflow[j] = last_wd[int(self.caffe.OBC_cells[k, 0]), int(
-                                self.caffe.OBC_cells[k, 1])] * self.caffe.cell_area / self.IntTimeStep
-                            last_wd[int(self.caffe.OBC_cells[k, 0]), int(
-                                self.caffe.OBC_cells[k, 1])] = 0.0
+                            x = int(self.caffe.OBC_cells[k, 0])
+                            y = int(self.caffe.OBC_cells[k, 1])
+                            inflow[j] = self.MaxFlowrate(
+                                j, last_wd[x, y], last_wd[x, y])
+                            last_wd[x, y] -= inflow[j]
                             k += 1
                         j += 1
-                    self.swmm.setNodesInflow(inflow)
+                    self.swmm.setNodesInflow(
+                        inflow * self.caffe.cell_area / self.IntTimeStep)
                     print(Fore.BLUE + "\nCA-ffé drained "
                           + str(np.sum(inflow) * self.IntTimeStep) + Style.RESET_ALL + "\n")
 
@@ -154,3 +157,30 @@ class csc:
                 last_wd = np.zeros_like(self.caffe.DEM, dtype=np.double)
 
         self.swmm.CloseSimulation()
+
+    def ManholeProp(self, coef, length):
+        coef = np.asarray(coef)
+        length = np.asarray(length)
+        if coef.size == 1 or coef.size == self.swmm_node_info.shape[0]:
+            if coef.size == 1:
+                coef = np.repeat(coef, self.swmm_node_info.shape[0])
+        else:
+            sys.exit("Weir discharge coefficient array size does not match ",
+                     "junction numbers")
+
+        if length.size == 1 or length.size == self.swmm_node_info.shape[0]:
+            if length.size == 1:
+                length = np.repeat(length, self.swmm_node_info.shape[0])
+        else:
+            sys.exit("Weir crest length array size does not match junction numbers")
+
+        self.WeirDisCoef = coef
+        self.WeirCrest = length
+
+    def MaxFlowrate(self, counter, waterdepth, calcq_height):
+        q = self.WeirDisCoef[counter] * self.WeirCrest[counter] * \
+            waterdepth * (self.g * waterdepth * 2)**0.5
+        if (q / self.caffe.cell_area * self.IntTimeStep) < calcq_height:
+            return q
+        else:
+            return calcq_height
