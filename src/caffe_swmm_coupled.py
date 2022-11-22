@@ -2,7 +2,9 @@ from .caffe import caffe
 from .swmm import swmm
 import numpy as np
 import sys
+import os
 from colorama import Fore, Back, Style
+from copy import deepcopy
 
 
 class csc:
@@ -119,9 +121,20 @@ class csc:
 
             nonflooded_nodes = self.swmm_node_info[np.logical_not(
                     flooded_nodes_flowrates > 0), 0:2]
+
+            # to run caffe without open boundries
+            caffecopy = deepcopy(self.caffe)
+
             self.caffe.OpenBCMapArray(nonflooded_nodes)
 
             if (tot_flood > 0 or np.sum(self.caffe.excess_volume_map) > 0):
+                sys.stdout = open(os.devnull, 'w')
+                caffecopy.RunSimulation()
+                caffecopy.ReportScreen()
+                actual_wd = caffecopy.water_depths
+                sys.stdout = sys.__stdout__
+                del caffecopy
+
                 self.caffe.RunSimulation()
                 self.caffe.ReportScreen()
 
@@ -137,14 +150,14 @@ class csc:
                             x = int(self.caffe.OBC_cells[k, 0])
                             y = int(self.caffe.OBC_cells[k, 1])
                             inflow[j] = self.MaxFlowrate(
-                                j, last_wd[x, y], last_wd[x, y])
+                                j, actual_wd[x, y], last_wd[x, y])
                             last_wd[x, y] -= inflow[j]
                             k += 1
                         j += 1
                     self.swmm.setNodesInflow(
                         inflow * self.caffe.cell_area / self.IntTimeStep)
                     print(Fore.BLUE + "\nCA-ffé drained "
-                          + str(np.sum(inflow) * self.IntTimeStep) + Style.RESET_ALL + "\n")
+                          + str(np.sum(inflow) * self.caffe.cell_area) + Style.RESET_ALL + "\n")
 
                 #For reporting purpose, WD changed. BTW, it will be reseted in the next step
                 if np.sum(last_wd) > 0:
