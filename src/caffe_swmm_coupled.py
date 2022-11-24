@@ -94,23 +94,35 @@ class csc:
 
         origin_name = self.caffe.outputs_name
         First_Step = True
-        last_wd = np.array([])
+        last_wd = np.array([[], []])
+        self.exchangeamount = np.array([])
+        self.nodeinfo = np.array([[], []])
+        self.time = np.array([])
 
         print(Fore.RED + "Starts running SWMM" + Style.RESET_ALL + "\n\n")
 
         for step in self.swmm.sim:
             print(Fore.GREEN + "SWMM @ "
                   + str(self.swmm.sim.current_time) + Style.RESET_ALL + "\n")
+            self.time = np.append(self.time, self.swmm.sim.current_time)
+            temp = np.array([0, 0], dtype=np.double)
+
+            nodeinfo = np.column_stack((self.swmm.getNodesHead(
+            ), self.swmm.getNodesTotalInflow(), self.swmm.getNodesTotalOutflow()))
 
             if First_Step:
                 First_Step = False
+                self.nodeinfo = nodeinfo
             else:
                 self.caffe.Reset_WL_EVM()
                 self.caffe.LoadInitialExcessWaterDepthArray(last_wd)
+                self.nodeinfo = np.dstack((self.nodeinfo, nodeinfo))
 
             flooded_nodes_flowrates = np.transpose(
                 self.swmm.getNodesFlooding()) * self.IntTimeStep
             tot_flood = np.sum(flooded_nodes_flowrates)
+            temp[0] = tot_flood
+
             if tot_flood > 0:
                 print(Fore.RED + "SWMM surcharged "
                       + str(tot_flood) + Style.RESET_ALL + "\n")
@@ -130,7 +142,7 @@ class csc:
             if (tot_flood > 0 or np.sum(self.caffe.excess_volume_map) > 0):
                 sys.stdout = open(os.devnull, 'w')
                 caffecopy.RunSimulation()
-                caffecopy.ReportScreen()
+                # caffecopy.ReportScreen()
                 actual_wd = caffecopy.water_depths
                 sys.stdout = sys.__stdout__
                 del caffecopy
@@ -158,6 +170,7 @@ class csc:
                         inflow * self.caffe.cell_area / self.IntTimeStep)
                     print(Fore.BLUE + "\nCA-ffé drained "
                           + str(np.sum(inflow) * self.caffe.cell_area) + Style.RESET_ALL + "\n")
+                    temp[1] = np.sum(inflow) * self.caffe.cell_area
 
                 #For reporting purpose, WD changed. BTW, it will be reseted in the next step
                 if np.sum(last_wd) > 0:
@@ -168,6 +181,12 @@ class csc:
 
             else:
                 last_wd = np.zeros_like(self.caffe.DEM, dtype=np.double)
+
+            self.exchangeamount = np.append(
+                self.exchangeamount, temp, axis=0)
+
+        self.exchangeamount = self.exchangeamount.reshape(
+            [int(self.exchangeamount.size/2), 2])
 
         self.swmm.CloseSimulation()
 
