@@ -12,11 +12,11 @@ class caffe():
         print("\n", time.ctime(), "\n")
 
         self.dem_file = dem_file
-        self.DEM, self.ClosedBC = util.DEMRead(dem_file)
+        self.DEM, self.ClosedBC, self.bounds = util.DEMRead(dem_file)
         self.DEMshape = self.DEM.shape
 
         # to initialise a CAffe model
-        self.BCtol = 1e6
+        self.BCtol = 1e9
         self.length = 1
         self.cell_area = 1
         self.vol_cutoff = 0.1
@@ -72,7 +72,7 @@ class caffe():
 
     def LoadInitialExcessWaterDepthFile(self, wd_file):
         self.user_waterdepth_file = True
-        self.excess_volume_map, tmp = util.DEMRead(wd_file)
+        self.excess_volume_map, tmp, bounds = util.DEMRead(wd_file)
 
     def LoadInitialExcessWaterDepthArray(self, wd_np):
         self.user_waterdepth_file = True

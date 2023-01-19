@@ -12,6 +12,7 @@ class swmm:
         print("\n")
         # load SWMM input file using hyno package
         self._hymo_inp = hymo.SWMMInpFile(inp_file)
+        self.bounds = np.zeros(4)
 
     def LoadNodes(self):
         self.nodes = Nodes(self.sim)
@@ -27,6 +28,11 @@ class swmm:
             [self._hymo_inp.coordinates, self.nodes_info], axis=1)
 
         self.node_list = list(self.nodes_info.index.values)
+
+        self.bounds[0]=np.amin(self._hymo_inp.coordinates, axis=0)[0]
+        self.bounds[1]=np.amax(self._hymo_inp.coordinates, axis=0)[1]
+        self.bounds[2]=np.amax(self._hymo_inp.coordinates, axis=0)[0]
+        self.bounds[3]=np.amin(self._hymo_inp.coordinates, axis=0)[1]
 
     def InteractionInterval(self, sec):
         self.sim.step_advance(sec)

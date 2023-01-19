@@ -9,7 +9,7 @@ import os
 
 
 def PlotDEM3d(dem_file, n=10, azdeg=290, altdeg=80, cmp_name='gist_earth'):
-    dem, mask = ut.DEMRead(dem_file)
+    dem, mask, bounds = ut.DEMRead(dem_file)
 
     x = np.linspace(0, dem.shape[0], dem.shape[1])
     y = np.linspace(0, dem.shape[1], dem.shape[0])
@@ -38,7 +38,7 @@ def PlotDEM3d(dem_file, n=10, azdeg=290, altdeg=80, cmp_name='gist_earth'):
 
 
 def PlotDEM2d(dem_file, cmp_name='gist_earth'):
-    dem, mask = ut.DEMRead(dem_file)
+    dem, mask, bounds = ut.DEMRead(dem_file)
 
     plt.imshow(dem.T, origin='lower', interpolation='nearest', cmap=cmp_name)
     plt.xlim(0, dem.shape[0])
@@ -63,7 +63,7 @@ def AnimateDEMs(path, name, fps=5, n=10, azdeg=290, altdeg=80, cmp_name='gist_ea
     images = []
 
     for file in files:
-        dem, mask = ut.DEMRead(file)
+        dem, mask, bounds = ut.DEMRead(file)
 
         x = np.linspace(0, dem.shape[0], dem.shape[1])
         y = np.linspace(0, dem.shape[1], dem.shape[0])

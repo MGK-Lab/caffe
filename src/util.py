@@ -31,7 +31,9 @@ def DEMRead(dem_file):
     DEM = src.read(band)
     msk = src.read_masks(band)
     DEM = DEM.astype(np.double)
-
+    bounds = np.zeros(4)
+    bounds = [src.bounds.left, src.bounds.top, src.bounds.right, src.bounds.bottom]
+ 
     mask = np.zeros_like(DEM, dtype=bool)
     mask[msk == 0] = True
     mask[0, :] = True
@@ -39,7 +41,7 @@ def DEMRead(dem_file):
     mask[:, 0] = True
     mask[:, -1] = True
 
-    return DEM, mask
+    return DEM, mask, bounds
 
 
 def DEMGenerate(npa, dst_filename):

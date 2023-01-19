@@ -11,6 +11,7 @@ class csc:
     def __init__(self):
         print("\n .....Initiating 2D-1D modelling using coupled SWMM & CA-ffé.....")
         self.g = 9.81
+        self.rel_diff = np.zeros(2)
 
     def LoadCaffe(self, DEM_file, hf, increment_constant, EV_threshold):
         self.caffe = caffe(DEM_file)
@@ -22,21 +23,31 @@ class csc:
         self.swmm.LoadNodes()
 
     def NodeElvCoordChecks(self):
+        # domain size check
+        c_b= self.caffe.bounds
+        s_b= self.swmm.bounds
+        if (c_b[0]<=s_b[0] and c_b[1]>=s_b[1] and c_b[2]>=s_b[2] and c_b[3]<=s_b[3]):
+            print('All SWMM junctions are bounded by the provided DEM')
+        else:
+            sys.exit(
+                "The SWMM junctions coordinates are out of the boundry of the provided DEM")
+
         self.swmm_node_info = self.swmm.nodes_info.to_numpy()
         self.swmm_node_info = np.column_stack(
             (self.swmm_node_info[:, 0], self.swmm_node_info[:, 1],
              self.swmm_node_info[:, 2] + self.swmm_node_info[:, 3], self.swmm_node_info[:, 4]))
 
         self.swmm_node_info[:, 0] = np.int_(
-            self.swmm_node_info[:, 0] / self.caffe.length)
+            (self.swmm_node_info[:, 0]-self.rel_diff[0]) / self.caffe.length)
         self.swmm_node_info[:, 1] = np.int_(
-            self.swmm_node_info[:, 1] / self.caffe.length)
+            (self.swmm_node_info[:, 1]-self.rel_diff[1]) / self.caffe.length)
 
         err = False
         i = 0
         for r in self.swmm_node_info:
             if ((r[0] < 0 or r[0] > self.caffe.DEMshape[0]
                     or r[1] < 0 or r[1] > self.caffe.DEMshape[1]) and r[3] == False):
+                print(self.swmm.node_list[i])
                 err = True
             i += 1
         if err:
@@ -48,8 +59,7 @@ class csc:
         for r in self.swmm_node_info:
             if ((abs(r[2] - self.caffe.DEM[np.int_(r[0]), np.int_(r[1])])
                     > 0.01 * self.caffe.DEM[np.int_(r[0]), np.int_(r[1])]) and r[3] == False):
-                print(self.swmm.node_list[i], " surface Elv != ",
-                      self.caffe.DEM[np.int_(r[0]), np.int_(r[1])])
+                print(self.swmm.node_list[i], " diff = ", self.caffe.DEM[np.int_(r[0]), np.int_(r[1])]-r[2])
                 err = True
             i += 1
         if err:
