@@ -27,30 +27,30 @@ class csc:
         self.swmm.LoadNodes()
 
     def NodeElvCoordChecks(self):
-        # domain size check
+        # domain size check is conducted here
         c_b= self.caffe.bounds
         s_b= self.swmm.bounds
-
-        self.rel_diff=[self.caffe.bounds[0], self.caffe.bounds[1]]
-
         if (c_b[0]<=s_b[0] and c_b[1]>=s_b[1] and c_b[2]>=s_b[2] and c_b[3]<=s_b[3]):
             print('All SWMM junctions are bounded by the provided DEM')
         else:
             sys.exit(
                 "The SWMM junctions coordinates are out of the boundry of the provided DEM")
 
-        self.swmm_node_info = self.swmm.nodes_info.to_numpy()
+        # convert node locations to DEM numpy system
+         self.swmm_node_info = self.swmm.nodes_info.to_numpy()
         self.swmm_node_info = np.column_stack(
             (self.swmm_node_info[:, 0], self.swmm_node_info[:, 1],
              self.swmm_node_info[:, 2] + self.swmm_node_info[:, 3], self.swmm_node_info[:, 4]))
-
+        self.rel_diff=[self.caffe.bounds[0], self.caffe.bounds[1]]
         self.swmm_node_info[:, 0] = np.int_(
             (self.swmm_node_info[:, 0]-self.rel_diff[0]) / self.caffe.length)
         self.swmm_node_info[:, 1] = np.int_(
             (self.rel_diff[1]-self.swmm_node_info[:, 1]) / self.caffe.length)
 
+        # when a DEM loaded coordinate system is reverse (Rasterio)
         self.swmm_node_info[:, [0,1]] = self.swmm_node_info[:, [1,0]]   
 
+        # plot SWMM nodes on DEM
         if self.plot_Node_DEM:
             temp= self.caffe.DEM
             temp[self.caffe.ClosedBC == True] = np.max(temp)
@@ -70,6 +70,7 @@ class csc:
         #     sys.exit(
         #         "The above SWMM junctions coordinates are out of the range in the provided DEM")
 
+        # Elevation check is conducted here
         err = False
         i = 0
         for r in self.swmm_node_info:
