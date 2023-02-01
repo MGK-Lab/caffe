@@ -16,6 +16,7 @@ class csc:
         self.elv_dif = 0.01
         self.plot_Node_DEM = False
         self.failed_node_check = np.array([], dtype=int)
+        self.weir_approach = False
 
     def LoadCaffe(self, DEM_file, hf, increment_constant, EV_threshold):
         self.caffe = caffe(DEM_file)
@@ -170,17 +171,20 @@ class csc:
                     flooded_nodes_flowrates > 0), 0:2]
 
             # to run caffe without open boundries
-            caffecopy = deepcopy(self.caffe)
+            if self.weir_approach:
+                caffecopy = deepcopy(self.caffe)
 
             self.caffe.OpenBCMapArray(nonflooded_nodes)
 
             if (tot_flood > 0 or np.sum(self.caffe.excess_volume_map) > 0):
-                sys.stdout = open(os.devnull, 'w')
-                caffecopy.RunSimulation()
-                # caffecopy.ReportScreen()
-                actual_wd = caffecopy.water_depths
-                sys.stdout = sys.__stdout__
-                del caffecopy
+                
+                if self.weir_approach:
+                    sys.stdout = open(os.devnull, 'w')
+                    caffecopy.RunSimulation()
+                    # caffecopy.ReportScreen()
+                    actual_wd = caffecopy.water_depths
+                    sys.stdout = sys.__stdout__
+                    del caffecopy
 
                 self.caffe.RunSimulation()
                 self.caffe.ReportScreen()
@@ -196,8 +200,13 @@ class csc:
                         else:
                             x = int(self.caffe.OBC_cells[k, 0])
                             y = int(self.caffe.OBC_cells[k, 1])
-                            inflow[j] = self.MaxFlowrate(
-                                j, actual_wd[x, y], last_wd[x, y])
+                            
+                            if self.weir_approach:
+                                inflow[j] = self.MaxFlowrate(
+                                    j, actual_wd[x, y], last_wd[x, y])
+                            else: 
+                                inflow[j] = last_wd[x, y]
+                                
                             last_wd[x, y] -= inflow[j]
                             k += 1
                         j += 1
