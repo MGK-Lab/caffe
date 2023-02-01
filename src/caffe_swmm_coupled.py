@@ -1,6 +1,7 @@
 from .caffe import caffe
 from .swmm import swmm
 import numpy as np
+import matplotlib.pyplot as plt
 import sys
 import os
 from colorama import Fore, Back, Style
@@ -12,6 +13,9 @@ class csc:
         print("\n .....Initiating 2D-1D modelling using coupled SWMM & CA-ffé.....")
         self.g = 9.81
         self.rel_diff = np.zeros(2)
+        self.elv_dif = 0.01
+        self.plot_Node_DEM = False
+        self.failed_node_check = np.array([], dtype=int)
 
     def LoadCaffe(self, DEM_file, hf, increment_constant, EV_threshold):
         self.caffe = caffe(DEM_file)
@@ -26,6 +30,9 @@ class csc:
         # domain size check
         c_b= self.caffe.bounds
         s_b= self.swmm.bounds
+
+        self.rel_diff=[self.caffe.bounds[0], self.caffe.bounds[1]]
+
         if (c_b[0]<=s_b[0] and c_b[1]>=s_b[1] and c_b[2]>=s_b[2] and c_b[3]<=s_b[3]):
             print('All SWMM junctions are bounded by the provided DEM')
         else:
@@ -40,31 +47,48 @@ class csc:
         self.swmm_node_info[:, 0] = np.int_(
             (self.swmm_node_info[:, 0]-self.rel_diff[0]) / self.caffe.length)
         self.swmm_node_info[:, 1] = np.int_(
-            (self.swmm_node_info[:, 1]-self.rel_diff[1]) / self.caffe.length)
+            (self.rel_diff[1]-self.swmm_node_info[:, 1]) / self.caffe.length)
 
-        err = False
-        i = 0
-        for r in self.swmm_node_info:
-            if ((r[0] < 0 or r[0] > self.caffe.DEMshape[0]
-                    or r[1] < 0 or r[1] > self.caffe.DEMshape[1]) and r[3] == False):
-                print(self.swmm.node_list[i])
-                err = True
-            i += 1
-        if err:
-            sys.exit(
-                "The above SWMM junctions coordinates are out of the range in the provided DEM")
+        self.swmm_node_info[:, [0,1]] = self.swmm_node_info[:, [1,0]]   
+
+        if self.plot_Node_DEM:
+            temp= self.caffe.DEM
+            temp[self.caffe.ClosedBC == True] = np.max(temp)
+            plt.imshow(temp, cmap='gray')
+            plt.scatter(self.swmm_node_info[:, 1],self.swmm_node_info[:, 0])
+            plt.show()
+ 
+        # err = False
+        # i = 0
+        # for r in self.swmm_node_info:
+        #     if ((r[0] < 0 or r[0] > self.caffe.DEMshape[0]
+        #             or r[1] < 0 or r[1] > self.caffe.DEMshape[1]) and r[3] == False):
+        #        print(self.swmm.node_list[i])
+        #        err = True
+        #     i += 1
+        # if err:
+        #     sys.exit(
+        #         "The above SWMM junctions coordinates are out of the range in the provided DEM")
 
         err = False
         i = 0
         for r in self.swmm_node_info:
             if ((abs(r[2] - self.caffe.DEM[np.int_(r[0]), np.int_(r[1])])
-                    > 0.01 * self.caffe.DEM[np.int_(r[0]), np.int_(r[1])]) and r[3] == False):
+                    > self.elv_dif * self.caffe.DEM[np.int_(r[0]), np.int_(r[1])]) and r[3] == False):
                 print(self.swmm.node_list[i], " diff = ", self.caffe.DEM[np.int_(r[0]), np.int_(r[1])]-r[2])
+                self.failed_node_check=np.append(self.failed_node_check, np.int_(i))
                 err = True
             i += 1
+ 
         if err:
+            temp=self.caffe.DEM
+            temp[self.caffe.ClosedBC == True] = np.max(temp)
+            plt.imshow(temp, cmap='gray')
+            plt.scatter(self.swmm_node_info[self.failed_node_check, 1],self.swmm_node_info[self.failed_node_check, 0])
+            plt.show()
+
             sys.exit(
-                "The above SWMM junctions surface elevation have > 1% difference with the provided DEM")
+                ["The above SWMM junctions surface elevation have >", self.elv_dif*100, "% difference with the provided DEM"])
 
         print("-----Nodes elevation and coordinates are compatible in both models (outfalls excluded)")
 
