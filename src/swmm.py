@@ -1,4 +1,6 @@
-from pyswmm import Simulation, Nodes
+from pyswmm import Simulation, Nodes, Output
+from swmm.toolkit.shared_enum import NodeAttribute
+from datetime import datetime, timedelta
 import hymo
 import numpy as np
 import pandas as pd
@@ -13,6 +15,7 @@ class swmm:
         # load SWMM input file using hyno package
         self._hymo_inp = hymo.SWMMInpFile(inp_file)
         self.bounds = np.zeros(4)
+        self.input_file = inp_file
 
     def LoadNodes(self):
         self.nodes = Nodes(self.sim)
@@ -28,11 +31,30 @@ class swmm:
             [self._hymo_inp.coordinates, self.nodes_info], axis=1)
 
         self.node_list = list(self.nodes_info.index.values)
+        self.No_Nodes = len(self.node_list)
 
         self.bounds[0]=np.amin(self._hymo_inp.coordinates, axis=0)[0]
         self.bounds[1]=np.amax(self._hymo_inp.coordinates, axis=0)[1]
         self.bounds[2]=np.amax(self._hymo_inp.coordinates, axis=0)[0]
         self.bounds[3]=np.amin(self._hymo_inp.coordinates, axis=0)[1]
+
+    def Output_getNodesFlooding(self):
+        # load PySWMM output file with the same file name
+        out_file = self.input_file[:-3] + "out"
+        self.out = Output(out_file)
+
+        flood_volume = np.zeros(self.No_Nodes)
+        report_timestep=self.out.times[-1]-self.out.times[0]
+        report_timestep=report_timestep.total_seconds()/(len(self.out.times)-1)
+
+        for n in range(self.No_Nodes):
+            temp=self.out.node_series(n, NodeAttribute.FLOODING_LOSSES)
+            flood_volume[n] = np.sum(np.array(list(temp.values())))
+
+        print('\nTotal flood Volume = ',np.sum(flood_volume)*report_timestep)
+        self.out.close()
+
+        return flood_volume
 
     def InteractionInterval(self, sec):
         self.sim.step_advance(sec)
