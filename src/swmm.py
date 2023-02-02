@@ -50,8 +50,10 @@ class swmm:
         for n in range(self.No_Nodes):
             temp=self.out.node_series(n, NodeAttribute.FLOODING_LOSSES)
             flood_volume[n] = np.sum(np.array(list(temp.values())))
+        
+        flood_volume *= report_timestep
 
-        print('\nTotal flood Volume = ',np.sum(flood_volume)*report_timestep)
+        print('\nTotal flood Volume = ',np.sum(flood_volume))
         self.out.close()
 
         return flood_volume

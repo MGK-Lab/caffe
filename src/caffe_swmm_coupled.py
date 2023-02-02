@@ -17,6 +17,7 @@ class csc:
         self.plot_Node_DEM = False
         self.failed_node_check = np.array([], dtype=int)
         self.weir_approach = False
+        self.volume_conversion = 0.001
 
     def LoadCaffe(self, DEM_file, hf, increment_constant, EV_threshold):
         self.caffe = caffe(DEM_file)
@@ -26,6 +27,9 @@ class csc:
     def LoadSwmm(self, SWMM_inp):
         self.swmm = swmm(SWMM_inp)
         self.swmm.LoadNodes()
+        print("\nSWMM system unit is: ", self.swmm.sim.system_units)
+        print("SWMM flow unit is:   ", self.swmm.sim.flow_units,"\n")
+
 
     def NodeElvCoordChecks(self):
         # domain size check is conducted here
@@ -38,7 +42,7 @@ class csc:
                 "The SWMM junctions coordinates are out of the boundry of the provided DEM")
 
         # convert node locations to DEM numpy system
-         self.swmm_node_info = self.swmm.nodes_info.to_numpy()
+        self.swmm_node_info = self.swmm.nodes_info.to_numpy()
         self.swmm_node_info = np.column_stack(
             (self.swmm_node_info[:, 0], self.swmm_node_info[:, 1],
              self.swmm_node_info[:, 2] + self.swmm_node_info[:, 3], self.swmm_node_info[:, 4]))
@@ -83,30 +87,46 @@ class csc:
             i += 1
  
         if err:
+            print("The above SWMM junctions surface elevation have >", self.elv_dif*100, "% difference with the provided DEM.\n")
             temp=self.caffe.DEM
             temp[self.caffe.ClosedBC == True] = np.max(temp)
             plt.imshow(temp, cmap='gray')
             plt.scatter(self.swmm_node_info[self.failed_node_check, 1],self.swmm_node_info[self.failed_node_check, 0])
             plt.show()
 
-            sys.exit(
-                ["The above SWMM junctions surface elevation have >", self.elv_dif*100, "% difference with the provided DEM"])
+        while err:
+            answer = input("Do you want to continue? (yes/no)")
+            if answer == "yes":
+                pass
+                break
+            elif answer == "no":
+                sys.exit()
+            else:
+                print("Invalid answer, please try again.")           
 
-        print("-----Nodes elevation and coordinates are compatible in both models (outfalls excluded)")
+        if not(err):
+            print("-----Nodes elevation and coordinates are compatible in both models (outfalls excluded)")
 
     def InteractionInterval(self, sec):
         self.swmm.InteractionInterval(sec)
         self.IntTimeStep = sec
 
     def RunOne_SWMMtoCaffe(self):
-        floodvolume = 0
-        for step in self.swmm.sim:
-            floodvolume += self.swmm.getNodesFlooding()
-        floodvolume = np.column_stack((self.swmm_node_info[:, 0:2],
-                                       np.transpose(floodvolume)*self.IntTimeStep))
-        self.swmm.CloseSimulation()
+        print("\nFor one-time one-way coupling of SWMM to Caffe apprach, SWMM model should generate a report for all nodes.")
+        continue_choice = input("Do you want to continue? (yes/no): ")
+        if continue_choice.lower() != "yes":
+            raise Exception("Program terminated to revise SWMM input file")
 
-        self.caffe.ExcessVolumeMapArray(floodvolume)
+        floodvolume = 0
+        self.swmm.sim.execute()
+        floodvolume = self.swmm.Output_getNodesFlooding()
+        # it is multiplied by DEM length as the caffe excess volume will get coordinates 
+        # not cell. swmm_node_info is already converted to cell location in NodeElvCoordChecks function
+        floodvolume = np.column_stack((self.swmm_node_info[:, 0:2]*self.caffe.length,
+                                       np.transpose(floodvolume)))
+
+        self.caffe.ExcessVolumeMapArray(floodvolume*self.volume_conversion)
+
         self.caffe.RunSimulation()
         self.caffe.CloseSimulation()
 
@@ -206,7 +226,7 @@ class csc:
                                     j, actual_wd[x, y], last_wd[x, y])
                             else: 
                                 inflow[j] = last_wd[x, y]
-                                
+
                             last_wd[x, y] -= inflow[j]
                             k += 1
                         j += 1
