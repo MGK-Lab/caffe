@@ -15,6 +15,8 @@ class caffe():
         self.DEM, self.ClosedBC, self.bounds = util.DEMRead(dem_file)
         self.DEMshape = self.DEM.shape
 
+        self.DEM[self.ClosedBC==True]=np.amax(self.DEM)
+
         # to initialise a CAffe model
         self.BCtol = 1e9
         self.length = 1

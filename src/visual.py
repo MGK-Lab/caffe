@@ -1,5 +1,5 @@
 from __future__ import division
-import util as ut
+import src.util as ut
 import numpy as np
 from matplotlib import cm
 from matplotlib.colors import LightSource
@@ -39,10 +39,12 @@ def PlotDEM3d(dem_file, n=10, azdeg=290, altdeg=80, cmp_name='gist_earth'):
 
 def PlotDEM2d(dem_file, cmp_name='gist_earth'):
     dem, mask, bounds = ut.DEMRead(dem_file)
-
-    plt.imshow(dem.T, origin='lower', interpolation='nearest', cmap=cmp_name)
-    plt.xlim(0, dem.shape[0])
-    plt.ylim(0, dem.shape[1])
+    mask[dem<=0]=True
+    dem[mask==True] = np.amax(dem)
+ 
+    plt.imshow(np.flipud(dem), origin='lower', interpolation='nearest', cmap=cmp_name)
+    plt.xlim(0, dem.shape[1])
+    plt.ylim(0, dem.shape[0])
     plt.grid()
 
     plt.xlabel('X Axis')

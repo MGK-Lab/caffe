@@ -9,6 +9,7 @@ def arraytoRasterIO(array, existingraster, dst_filename):
     """this function is used to save a 2D numpy array as a GIS raster map"""
     with rio.open(existingraster) as src:
         naip_meta = src.profile
+        mask = src.dataset_mask()
 
     naip_meta['count'] = 1
     naip_meta['nodata'] = -999
@@ -17,7 +18,7 @@ def arraytoRasterIO(array, existingraster, dst_filename):
 
     # write your the ndvi raster object
     with rio.open(dst_filename, 'w', **naip_meta) as dst:
-        dst.write(array, 1)
+        dst.write(np.ma.masked_array(array, mask), 1)
 
 
 def DEMRead(dem_file):
@@ -44,7 +45,7 @@ def DEMRead(dem_file):
     return DEM, mask, bounds
 
 
-def DEMGenerate(npa, dst_filename):
+def DEMGenerate(npa, dst_filename, mask=None):
     """this function is used to generate digital elevation model (DEM file) of
     the 1st layer (band = 1) using a numpy array"""
     profile = DefaultGTiffProfile(count=1)
@@ -59,6 +60,9 @@ def DEMGenerate(npa, dst_filename):
     warnings.filterwarnings(
         "ignore", category=rio.errors.NotGeoreferencedWarning)
 
+    if mask is not None:
+        npa = np.ma.masked_array(npa, mask)
+        
     with rio.open(dst_filename, 'w', **profile) as dst:
         dst.write(npa, 1)
 

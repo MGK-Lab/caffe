@@ -18,6 +18,7 @@ class csc:
         self.failed_node_check = np.array([], dtype=int)
         self.weir_approach = False
         self.volume_conversion = 0.001
+        self.recrusive_run = False
 
     def LoadCaffe(self, DEM_file, hf, increment_constant, EV_threshold):
         self.caffe = caffe(DEM_file)
@@ -86,7 +87,7 @@ class csc:
                 err = True
             i += 1
  
-        if err:
+        if (err and not(self.recrusive_run)):
             print("The above SWMM junctions surface elevation have >", self.elv_dif*100, "% difference with the provided DEM.\n")
             temp=self.caffe.DEM
             temp[self.caffe.ClosedBC == True] = np.max(temp)
@@ -94,7 +95,7 @@ class csc:
             plt.scatter(self.swmm_node_info[self.failed_node_check, 1],self.swmm_node_info[self.failed_node_check, 0])
             plt.show()
 
-        while err:
+        while (err and not(self.recrusive_run)):
             answer = input("Do you want to continue? (yes/no)")
             if answer == "yes":
                 pass
@@ -112,21 +113,20 @@ class csc:
         self.IntTimeStep = sec
 
     def RunOne_SWMMtoCaffe(self):
-        print("\nFor one-time one-way coupling of SWMM to Caffe apprach, SWMM model should generate a report for all nodes.")
-        continue_choice = input("Do you want to continue? (yes/no): ")
-        if continue_choice.lower() != "yes":
-            raise Exception("Program terminated to revise SWMM input file")
+        if not(self.recrusive_run):
+            print("\nFor one-time one-way coupling of SWMM to Caffe apprach, SWMM model should generate a report for all nodes.")
+            continue_choice = input("Do you want to continue? (yes/no): ")
+            if continue_choice.lower() != "yes":
+                raise Exception("Program terminated to revise SWMM input file")
 
-        floodvolume = 0
         self.swmm.sim.execute()
         floodvolume = self.swmm.Output_getNodesFlooding()
         # it is multiplied by DEM length as the caffe excess volume will get coordinates 
         # not cell. swmm_node_info is already converted to cell location in NodeElvCoordChecks function
         floodvolume = np.column_stack((self.swmm_node_info[:, 0:2]*self.caffe.length,
-                                       np.transpose(floodvolume)))
+                                       np.transpose(floodvolume*self.volume_conversion)))
 
-        self.caffe.ExcessVolumeMapArray(floodvolume*self.volume_conversion)
-
+        self.caffe.ExcessVolumeMapArray(floodvolume)
         self.caffe.RunSimulation()
         self.caffe.CloseSimulation()
 
