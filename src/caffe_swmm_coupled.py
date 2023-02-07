@@ -1,5 +1,5 @@
-from .caffe import caffe
-from .swmm import swmm
+from caffe import caffe
+from cswmm import swmm
 import numpy as np
 import matplotlib.pyplot as plt
 import sys
@@ -119,7 +119,7 @@ class csc:
             if continue_choice.lower() != "yes":
                 raise Exception("Program terminated to revise SWMM input file")
 
-        self.swmm.sim.execute()
+        # self.swmm.sim.execute()
         floodvolume = self.swmm.Output_getNodesFlooding()
         # it is multiplied by DEM length as the caffe excess volume will get coordinates 
         # not cell. swmm_node_info is already converted to cell location in NodeElvCoordChecks function

@@ -1,5 +1,5 @@
 from __future__ import division
-import src.util as ut
+import util as ut
 import numpy as np
 from matplotlib import cm
 from matplotlib.colors import LightSource

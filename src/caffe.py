@@ -2,7 +2,7 @@ import caffe_core
 import numpy as np
 import time
 import sys
-from . import util
+import util
 import os
 
 
