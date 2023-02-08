@@ -52,7 +52,7 @@ def PlotDEM2d(dem_file, cmp_name='gist_earth'):
     # plt.show()
 
 
-def AnimateDEMs(path, name, fps=5, n=10, azdeg=290, altdeg=80, cmp_name='gist_earth'):
+def AnimateDEMs3d(path, name, fps=5, n=10, azdeg=290, altdeg=80, cmp_name='gist_earth'):
 
     files = [os.path.join(dirpath, f) for (dirpath, dirnames, filenames)
              in os.walk(path) for f in filenames]
@@ -79,6 +79,27 @@ def AnimateDEMs(path, name, fps=5, n=10, azdeg=290, altdeg=80, cmp_name='gist_ea
 
         image = ax.plot_surface(y, x, z, rstride=1, cstride=1, facecolors=rgb,
                                 linewidth=0, antialiased=False, shade=False)
+        images.append([image])
+
+    ani = animation.ArtistAnimation(fig, images)
+    writergif = animation.PillowWriter(fps=fps)
+    ani.save(name, writer=writergif)
+
+def AnimateDEMs2d(path, name, fps=5, n=10, cmp_name='gist_earth'):
+    files = [os.path.join(dirpath, f) for (dirpath, dirnames, filenames)
+             in os.walk(path) for f in filenames]
+    files.sort()
+
+    fig, ax = plt.subplots()
+    images = []
+
+    for file in files:
+        dem, mask, bounds = ut.DEMRead(file)
+
+        region = np.s_[0:dem.shape[0]:n, 0:dem.shape[1]:n]
+        z = dem[region]
+
+        image = ax.imshow(z, cmap=cmp_name)
         images.append([image])
 
     ani = animation.ArtistAnimation(fig, images)

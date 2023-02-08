@@ -120,7 +120,7 @@ class csc:
             if continue_choice.lower() != "yes":
                 raise Exception("Program terminated to revise SWMM input file")
 
-        # self.swmm.sim.execute()
+        self.swmm.sim.execute()
         floodvolume = self.swmm.Output_getNodesFlooding()
         # it is multiplied by DEM length as the caffe excess volume will get coordinates 
         # not cell. swmm_node_info is already converted to cell location in NodeElvCoordChecks function
@@ -180,14 +180,14 @@ class csc:
                 self.nodeinfo = np.dstack((self.nodeinfo, nodeinfo))
 
             flooded_nodes_flowrates = np.transpose(
-                self.swmm.getNodesFlooding()) * self.IntTimeStep
+                self.swmm.getNodesFlooding()) * self.IntTimeStep * self.volume_conversion
             tot_flood = np.sum(flooded_nodes_flowrates)
             temp[0] = tot_flood
 
             if tot_flood > 0:
                 print(Fore.RED + "SWMM surcharged "
                       + str(tot_flood) + Style.RESET_ALL + "\n")
-                floodvolume = np.column_stack((self.swmm_node_info[:, 0:2],
+                floodvolume = np.column_stack((self.swmm_node_info[:, 0:2]*self.caffe.length,
                                                flooded_nodes_flowrates
                                                / self.caffe.cell_area))
                 self.caffe.ExcessVolumeMapArray(floodvolume, True)
@@ -195,7 +195,7 @@ class csc:
             nonflooded_nodes = self.swmm_node_info[np.logical_not(
                     flooded_nodes_flowrates > 0), 0:2]
 
-            # to run caffe without open boundries
+            # to run caffe without open boundries for weir equation calculations
             if self.weir_approach:
                 caffecopy = deepcopy(self.caffe)
 
