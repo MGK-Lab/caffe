@@ -1,12 +1,11 @@
 import numpy as np
 
 class PerformanceIndicators:
-    def __init__(self, pred, ref):
-        self.min_depth = 0.05
+    def __init__(self, pred, ref,min_depth = 0.05):
         self.pred_org = np.array(pred)
         self.ref_org = np.array(ref)
-        self.pred = np.where(self.pred_org >= self.min_depth, True, False)
-        self.ref = np.where(self.ref_org >= self.min_depth, True, False)
+        self.pred = np.where(self.pred_org >= min_depth, True, False)
+        self.ref = np.where(self.ref_org >= min_depth, True, False)
         self.indicators = {
             'hr': self.hit_rate(),
             'far': self.false_alarm_rate(),
@@ -21,7 +20,8 @@ class PerformanceIndicators:
 
     def false_alarm_rate(self):
         false_alarms = np.sum((self.pred == True) & (self.ref == False))
-        return false_alarms / (np.sum((self.pred == True) & (self.ref == True)) + false_alarms)
+        hits = np.sum((self.pred == True) & (self.ref == True))
+        return false_alarms / (hits+false_alarms)
 
     def critical_success_index(self):
         hits = np.sum((self.pred == True) & (self.ref == True))

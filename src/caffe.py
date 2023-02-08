@@ -82,8 +82,7 @@ class caffe():
 
     def OpenBCMapArray(self, OBCM_np):
         self.OBC_cells = np.zeros_like(OBCM_np, dtype=np.int)
-        OBCM_np[:, 0] = OBCM_np[:, 0] / self.length
-        OBCM_np[:, 1] = OBCM_np[:, 1] / self.length
+        OBCM_np = OBCM_np / self.length
 
         i = 0
         for r in OBCM_np:
@@ -169,18 +168,19 @@ class caffe():
               "seconds")
 
     def ReportScreen(self):
+        indices = np.logical_and(self.ClosedBC == False, self.OpenBC == False)
         print("\n")
         print("water depth (min, max):       ", np.min(
-            self.water_depths), ", ", np.max(self.water_depths))
+            self.water_depths[indices]), ", ", np.max(self.water_depths[indices]))
 
-        print("max water depth (min, max):   ", np.min(self.max_water_depths),
-              ", ", np.max(self.max_water_depths))
+        print("max water depth (min, max):   ", np.min(self.max_water_depths[indices]),
+              ", ", np.max(self.max_water_depths[indices]))
 
         print("water level (min, max):       ", np.min(
-            self.water_levels), ", ", np.max(self.water_levels))
+            self.water_levels[indices]), ", ", np.max(self.water_levels[indices]))
 
-        print("max water level (min, max):   ", np.min(self.max_water_levels),
-              ", ", np.max(self.max_water_levels))
+        print("max water level (min, max):   ", np.min(self.max_water_levels[indices]),
+              ", ", np.max(self.max_water_levels[indices]))
 
         print("Sum of total spreaded volume: ", np.sum(
             self.water_depths) * self.cell_area)

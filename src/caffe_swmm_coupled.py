@@ -82,7 +82,8 @@ class csc:
         for r in self.swmm_node_info:
             if ((abs(r[2] - self.caffe.DEM[np.int_(r[0]), np.int_(r[1])])
                     > self.elv_dif * self.caffe.DEM[np.int_(r[0]), np.int_(r[1])]) and r[3] == False):
-                print(self.swmm.node_list[i], " diff = ", self.caffe.DEM[np.int_(r[0]), np.int_(r[1])]-r[2])
+                if not(self.recrusive_run):
+                    print(self.swmm.node_list[i], " diff = ", self.caffe.DEM[np.int_(r[0]), np.int_(r[1])]-r[2])
                 self.failed_node_check=np.append(self.failed_node_check, np.int_(i))
                 err = True
             i += 1
@@ -132,16 +133,20 @@ class csc:
 
     def RunMulti_SWMMtoCaffe(self):
         origin_name = self.caffe.outputs_name
+        old_mwd = np.zeros_like(self.caffe.DEM, dtype=np.double)
 
         for step in self.swmm.sim:
-            tmp = self.swmm.getNodesFlooding()
-            if (np.sum(tmp) > 0):
-                floodvolume = np.column_stack((self.swmm_node_info[:, 0:2],
-                                               np.transpose(tmp)*self.IntTimeStep))
-                self.caffe.ExcessVolumeMapArray(floodvolume)
+            floodvolume = self.swmm.getNodesFlooding()
+            if (np.sum(floodvolume) > 0):
+                floodvolume = np.column_stack((self.swmm_node_info[:, 0:2]*self.caffe.length,
+                                               np.transpose(floodvolume)*self.IntTimeStep*self.volume_conversion))
+                self.caffe.ExcessVolumeMapArray(floodvolume, False)
                 self.caffe.outputs_name = origin_name + \
                     "_" + str(self.swmm.sim.current_time)
                 self.caffe.RunSimulation()
+                # to avoid loosing friction headloss
+                self.caffe.max_water_depths = np.maximum(self.caffe.max_water_depths,old_mwd)
+                old_mwd = self.caffe.max_water_depths
                 self.caffe.CloseSimulation()
 
         self.swmm.CloseSimulation()
