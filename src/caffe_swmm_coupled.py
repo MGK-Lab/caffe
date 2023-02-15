@@ -6,11 +6,14 @@ import sys
 import os
 from colorama import Fore, Back, Style
 from copy import deepcopy
+import time
 
 
 class csc:
     def __init__(self):
         print("\n .....Initiating 2D-1D modelling using coupled SWMM & CA-ffé.....")
+        print("\n", time.ctime(), "\n")
+
         self.g = 9.81
         self.rel_diff = np.zeros(2)
         self.elv_dif = 0.01
@@ -130,6 +133,9 @@ class csc:
         self.caffe.ExcessVolumeMapArray(floodvolume)
         self.caffe.RunSimulation()
         self.caffe.CloseSimulation()
+        print("\n .....finished one-directional coupled SWMM & CA-ffé - one timestep.....")
+        print("\n", time.ctime(), "\n")
+
 
     def RunMulti_SWMMtoCaffe(self):
         origin_name = self.caffe.outputs_name
@@ -150,6 +156,8 @@ class csc:
                 self.caffe.CloseSimulation()
 
         self.swmm.CloseSimulation()
+        print("\n .....finished one-directional coupled SWMM & CA-ffé - multi timestep.....")
+        print("\n", time.ctime(), "\n")
 
     def Run_Caffe_BD_SWMM(self):
 
@@ -258,6 +266,10 @@ class csc:
             [int(self.exchangeamount.size/2), 2])
 
         self.swmm.CloseSimulation()
+
+        print("\n .....finished bi-directional coupled SWMM & CA-ffé.....")
+        print("\n", time.ctime(), "\n")
+
 
     def ManholeProp(self, coef, length):
         coef = np.asarray(coef)
