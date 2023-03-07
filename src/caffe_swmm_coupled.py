@@ -7,12 +7,14 @@ import os
 from colorama import Fore, Back, Style
 from copy import deepcopy
 import time
+import util
 
 
 class csc:
     def __init__(self):
         print("\n .....Initiating 2D-1D modelling using coupled SWMM & CA-ffé.....")
         print("\n", time.ctime(), "\n")
+        self.t = time.time()
 
         self.g = 9.81
         self.rel_diff = np.zeros(2)
@@ -32,14 +34,13 @@ class csc:
         self.swmm = swmm(SWMM_inp)
         self.swmm.LoadNodes()
         print("\nSWMM system unit is: ", self.swmm.sim.system_units)
-        print("SWMM flow unit is:   ", self.swmm.sim.flow_units,"\n")
-
+        print("SWMM flow unit is:   ", self.swmm.sim.flow_units, "\n")
 
     def NodeElvCoordChecks(self):
         # domain size check is conducted here
-        c_b= self.caffe.bounds
-        s_b= self.swmm.bounds
-        if (c_b[0]<=s_b[0] and c_b[1]>=s_b[1] and c_b[2]>=s_b[2] and c_b[3]<=s_b[3]):
+        c_b = self.caffe.bounds
+        s_b = self.swmm.bounds
+        if (c_b[0] <= s_b[0] and c_b[1] >= s_b[1] and c_b[2] >= s_b[2] and c_b[3] <= s_b[3]):
             print('All SWMM junctions are bounded by the provided DEM')
         else:
             sys.exit(
@@ -50,23 +51,30 @@ class csc:
         self.swmm_node_info = np.column_stack(
             (self.swmm_node_info[:, 0], self.swmm_node_info[:, 1],
              self.swmm_node_info[:, 2] + self.swmm_node_info[:, 3], self.swmm_node_info[:, 4]))
-        self.rel_diff=[self.caffe.bounds[0], self.caffe.bounds[1]]
+        self.rel_diff = [self.caffe.bounds[0], self.caffe.bounds[1]]
         self.swmm_node_info[:, 0] = np.int_(
             (self.swmm_node_info[:, 0]-self.rel_diff[0]) / self.caffe.length)
         self.swmm_node_info[:, 1] = np.int_(
             (self.rel_diff[1]-self.swmm_node_info[:, 1]) / self.caffe.length)
 
         # when a DEM loaded coordinate system is reverse (Rasterio)
-        self.swmm_node_info[:, [0,1]] = self.swmm_node_info[:, [1,0]]   
+        self.swmm_node_info[:, [0, 1]] = self.swmm_node_info[:, [1, 0]]
+        # saving nodes on a raster
+        tmp = np.zeros_like(self.caffe.DEM, dtype=np.double)
+        for i in self.swmm_node_info:
+            tmp[i[0], i[1]] = 1
+
+        util.arraytoRasterIO(tmp, self.caffe.dem_file,
+                             self.caffe.outputs_path + 'swmm_nodes_raster.tif')
 
         # plot SWMM nodes on DEM
         if self.plot_Node_DEM:
-            temp= self.caffe.DEM
+            temp = self.caffe.DEM
             temp[self.caffe.ClosedBC == True] = np.max(temp)
             plt.imshow(temp, cmap='gray')
-            plt.scatter(self.swmm_node_info[:, 1],self.swmm_node_info[:, 0])
+            plt.scatter(self.swmm_node_info[:, 1], self.swmm_node_info[:, 0])
             plt.show()
- 
+
         # err = False
         # i = 0
         # for r in self.swmm_node_info:
@@ -85,21 +93,25 @@ class csc:
         for r in self.swmm_node_info:
             if ((abs(r[2] - self.caffe.DEM[np.int_(r[0]), np.int_(r[1])])
                     > self.elv_dif * self.caffe.DEM[np.int_(r[0]), np.int_(r[1])]) and r[3] == False):
-                if not(self.recrusive_run):
-                    print(self.swmm.node_list[i], " diff = ", self.caffe.DEM[np.int_(r[0]), np.int_(r[1])]-r[2])
-                self.failed_node_check=np.append(self.failed_node_check, np.int_(i))
+                if not (self.recrusive_run):
+                    print(self.swmm.node_list[i], " diff = ", self.caffe.DEM[np.int_(
+                        r[0]), np.int_(r[1])]-r[2])
+                self.failed_node_check = np.append(
+                    self.failed_node_check, np.int_(i))
                 err = True
             i += 1
- 
-        if (err and not(self.recrusive_run)):
-            print("The above SWMM junctions surface elevation have >", self.elv_dif*100, "% difference with the provided DEM.\n")
-            temp=self.caffe.DEM
+
+        if (err and not (self.recrusive_run)):
+            print("The above SWMM junctions surface elevation have >",
+                  self.elv_dif*100, "% difference with the provided DEM.\n")
+            temp = self.caffe.DEM
             temp[self.caffe.ClosedBC == True] = np.max(temp)
             plt.imshow(temp, cmap='gray')
-            plt.scatter(self.swmm_node_info[self.failed_node_check, 1],self.swmm_node_info[self.failed_node_check, 0])
+            plt.scatter(self.swmm_node_info[self.failed_node_check, 1],
+                        self.swmm_node_info[self.failed_node_check, 0])
             plt.show()
 
-        while (err and not(self.recrusive_run)):
+        while (err and not (self.recrusive_run)):
             answer = input("Do you want to continue? (yes/no)")
             if answer == "yes":
                 pass
@@ -107,17 +119,18 @@ class csc:
             elif answer == "no":
                 sys.exit()
             else:
-                print("Invalid answer, please try again.")           
+                print("Invalid answer, please try again.")
 
-        if not(err):
-            print("-----Nodes elevation and coordinates are compatible in both models (outfalls excluded)")
+        if not (err):
+            print(
+                "-----Nodes elevation and coordinates are compatible in both models (outfalls excluded)")
 
     def InteractionInterval(self, sec):
         self.swmm.InteractionInterval(sec)
         self.IntTimeStep = sec
 
     def RunOne_SWMMtoCaffe(self):
-        if not(self.recrusive_run):
+        if not (self.recrusive_run):
             print("\nFor one-time one-way coupling of SWMM to Caffe apprach, SWMM model should generate a report for all nodes.")
             continue_choice = input("Do you want to continue? (yes/no): ")
             if continue_choice.lower() != "yes":
@@ -125,7 +138,7 @@ class csc:
 
         self.swmm.sim.execute()
         floodvolume = self.swmm.Output_getNodesFlooding()
-        # it is multiplied by DEM length as the caffe excess volume will get coordinates 
+        # it is multiplied by DEM length as the caffe excess volume will get coordinates
         # not cell. swmm_node_info is already converted to cell location in NodeElvCoordChecks function
         floodvolume = np.column_stack((self.swmm_node_info[:, 0:2]*self.caffe.length,
                                        np.transpose(floodvolume*self.volume_conversion)))
@@ -135,7 +148,7 @@ class csc:
         self.caffe.CloseSimulation()
         print("\n .....finished one-directional coupled SWMM & CA-ffé - one timestep.....")
         print("\n", time.ctime(), "\n")
-
+        print("\n Duration: ", time.time()-self.t, "\n")
 
     def RunMulti_SWMMtoCaffe(self):
         origin_name = self.caffe.outputs_name
@@ -151,13 +164,16 @@ class csc:
                     "_" + str(self.swmm.sim.current_time)
                 self.caffe.RunSimulation()
                 # to avoid loosing friction headloss
-                self.caffe.max_water_depths = np.maximum(self.caffe.max_water_depths,old_mwd)
+                self.caffe.max_water_depths = np.maximum(
+                    self.caffe.max_water_depths, old_mwd)
                 old_mwd = self.caffe.max_water_depths
                 self.caffe.CloseSimulation()
 
         self.swmm.CloseSimulation()
-        print("\n .....finished one-directional coupled SWMM & CA-ffé - multi timestep.....")
+        print(
+            "\n .....finished one-directional coupled SWMM & CA-ffé - multi timestep.....")
         print("\n", time.ctime(), "\n")
+        print("\n Duration: ", time.time()-self.t, "\n")
 
     def Run_Caffe_BD_SWMM(self):
 
@@ -201,7 +217,7 @@ class csc:
                 self.caffe.ExcessVolumeMapArray(floodvolume, True)
 
             nonflooded_nodes = self.swmm_node_info[np.logical_not(
-                    flooded_nodes_flowrates > 0), 0:2]
+                flooded_nodes_flowrates > 0), 0:2]
 
             # to run caffe without open boundries for weir equation calculations
             if self.weir_approach:
@@ -210,7 +226,7 @@ class csc:
             self.caffe.OpenBCMapArray(nonflooded_nodes)
 
             if (tot_flood > 0 or np.sum(self.caffe.excess_volume_map) > 0):
-                
+
                 if self.weir_approach:
                     sys.stdout = open(os.devnull, 'w')
                     caffecopy.RunSimulation()
@@ -233,11 +249,11 @@ class csc:
                         else:
                             x = int(self.caffe.OBC_cells[k, 0])
                             y = int(self.caffe.OBC_cells[k, 1])
-                            
+
                             if self.weir_approach:
                                 inflow[j] = self.MaxFlowrate(
                                     j, actual_wd[x, y], last_wd[x, y])
-                            else: 
+                            else:
                                 inflow[j] = last_wd[x, y]
 
                             last_wd[x, y] -= inflow[j]
@@ -249,7 +265,7 @@ class csc:
                           + str(np.sum(inflow) * self.caffe.cell_area) + Style.RESET_ALL + "\n")
                     temp[1] = np.sum(inflow) * self.caffe.cell_area
 
-                #For reporting purpose, WD changed. BTW, it will be reseted in the next step
+                # For reporting purpose, WD changed. BTW, it will be reseted in the next step
                 if np.sum(last_wd) > 0:
                     self.caffe.water_depths = last_wd
                     self.caffe.outputs_name = origin_name + \
@@ -269,7 +285,7 @@ class csc:
 
         print("\n .....finished bi-directional coupled SWMM & CA-ffé.....")
         print("\n", time.ctime(), "\n")
-
+        print("\n Duration: ", time.time()-self.t, "\n")
 
     def ManholeProp(self, coef, length):
         coef = np.asarray(coef)

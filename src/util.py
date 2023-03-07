@@ -21,6 +21,24 @@ def arraytoRasterIO(array, existingraster, dst_filename):
         dst.write(np.ma.masked_array(array, mask), 1)
 
 
+def VelocitytoRasterIO(velx, vely, existingraster, dst_filename):
+    with rio.open(existingraster) as src:
+        naip_meta = src.profile
+        mask = src.dataset_mask()
+
+    naip_meta['count'] = 2
+    naip_meta['nodata'] = -999
+    naip_meta['dtype'] = 'float32'
+    naip_meta['nodata'] = -999
+    warnings.filterwarnings(
+        "ignore", category=rio.errors.NotGeoreferencedWarning)
+
+    # write your the ndvi raster object
+    with rio.open(dst_filename, 'w', **naip_meta) as dst:
+        dst.write(np.ma.masked_array(velx, mask), 1)
+        dst.write(np.ma.masked_array(vely, mask), 2)
+
+
 def DEMRead(dem_file):
     """this function is used to read digital elevation model (DEM file) of
     the 1st layer (band = 1)"""
@@ -33,8 +51,9 @@ def DEMRead(dem_file):
     msk = src.read_masks(band)
     DEM = DEM.astype(np.double)
     bounds = np.zeros(4)
-    bounds = [src.bounds.left, src.bounds.top, src.bounds.right, src.bounds.bottom]
- 
+    bounds = [src.bounds.left, src.bounds.top,
+              src.bounds.right, src.bounds.bottom]
+
     mask = np.zeros_like(DEM, dtype=bool)
     mask[msk == 0] = True
     mask[0, :] = True
@@ -62,7 +81,7 @@ def DEMGenerate(npa, dst_filename, mask=None):
 
     if mask is not None:
         npa = np.ma.masked_array(npa, mask)
-        
+
     with rio.open(dst_filename, 'w', **profile) as dst:
         dst.write(npa, 1)
 
