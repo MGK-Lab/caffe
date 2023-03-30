@@ -1,7 +1,10 @@
-import src.util as ut
-import numpy as np
 import matplotlib.pyplot as plt
-import src.visual as vs
+import numpy as np
+import sys
+sys.path.append("./src")
+from caffe import caffe  # NOQA
+import util as ut  # NOQA
+import visual as vs  # NOQA
 
 
 if __name__ == "__main__":

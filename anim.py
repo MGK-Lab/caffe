@@ -1,4 +1,7 @@
-import src.visual as vs
+import numpy as np
+import sys
+sys.path.append("./src")
+import visual as vs  # NOQA
 
 if __name__ == "__main__":
 

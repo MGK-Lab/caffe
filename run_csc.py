@@ -1,7 +1,8 @@
-from src.caffe_swmm_coupled import csc
-import matplotlib.pyplot as plt
 import numpy as np
-import matplotlib.dates as dates
+import sys
+sys.path.append("./src")
+from src.caffe_swmm_coupled import csc  # NOQA
+
 
 if __name__ == "__main__":
 
@@ -24,8 +25,6 @@ if __name__ == "__main__":
     csc_obj.InteractionInterval(600)
     csc_obj.caffe.setSpreadVolumeCutoff(0.001)
     csc_obj.ManholeProp(0.5, 1)
-    # csc_obj.RunMulti_SWMMtoCaffe()
     csc_obj.Run_Caffe_BD_SWMM()
-
-    np.savez('./maz', csc_obj.time,
-             csc_obj.exchangeamount, csc_obj.nodeinfo)
+    # csc_obj.RunMulti_SWMMtoCaffe()
+    # csc_obj.Run_Caffe_BD_SWMM()

@@ -1,5 +1,7 @@
 import numpy as np
-import src.util as ut
+import sys
+sys.path.append("./src")
+import util as ut  # NOQA
 
 if __name__ == "__main__":
 

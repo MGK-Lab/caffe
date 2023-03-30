@@ -39,10 +39,11 @@ def PlotDEM3d(dem_file, n=10, azdeg=290, altdeg=80, cmp_name='gist_earth'):
 
 def PlotDEM2d(dem_file, cmp_name='gist_earth'):
     dem, mask, bounds = ut.DEMRead(dem_file)
-    mask[dem<=0]=True
-    dem[mask==True] = np.amax(dem)
- 
-    plt.imshow(np.flipud(dem), origin='lower', interpolation='nearest', cmap=cmp_name)
+    mask[dem <= 0] = True
+    dem[mask == True] = np.amax(dem)
+
+    plt.imshow(np.flipud(dem), origin='lower',
+               interpolation='nearest', cmap=cmp_name)
     plt.xlim(0, dem.shape[1])
     plt.ylim(0, dem.shape[0])
     plt.grid()
@@ -85,6 +86,7 @@ def AnimateDEMs3d(path, name, fps=5, n=10, azdeg=290, altdeg=80, cmp_name='gist_
     writergif = animation.PillowWriter(fps=fps)
     ani.save(name, writer=writergif)
 
+
 def AnimateDEMs2d(path, name, fps=5, n=10, cmp_name='gist_earth'):
     files = [os.path.join(dirpath, f) for (dirpath, dirnames, filenames)
              in os.walk(path) for f in filenames]
@@ -95,6 +97,8 @@ def AnimateDEMs2d(path, name, fps=5, n=10, cmp_name='gist_earth'):
 
     for file in files:
         dem, mask, bounds = ut.DEMRead(file)
+        mask[dem <= 0] = True
+        dem[mask == True] = 100
 
         region = np.s_[0:dem.shape[0]:n, 0:dem.shape[1]:n]
         z = dem[region]

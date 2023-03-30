@@ -1,5 +1,7 @@
-import src.visual as vs
 import matplotlib.pyplot as plt
+import sys
+sys.path.append("./src")
+import visual as vs  # NOQA
 
 if __name__ == "__main__":
 

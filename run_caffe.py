@@ -1,5 +1,7 @@
-from src.caffe import caffe
 import numpy as np
+import sys
+sys.path.append("./src")
+from caffe import caffe  # NOQA
 
 
 if __name__ == "__main__":
