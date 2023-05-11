@@ -24,6 +24,12 @@ class csc:
         self.weir_approach = False
         self.volume_conversion = 0.001
         self.recrusive_run = False
+        self.active_nodes = np.array([])
+
+    def ActiveNodes(self, filename):
+        with open(filename, 'r') as file:
+            names = file.read().splitlines()
+        self.active_nodes = np.array(names)
 
     def LoadCaffe(self, DEM_file, hf, increment_constant, EV_threshold):
         self.caffe = caffe(DEM_file)
@@ -47,6 +53,7 @@ class csc:
                 "The SWMM junctions coordinates are out of the boundry of the provided DEM")
 
         # convert node locations to DEM numpy system
+        # coulumns are: 1 and 2 coordinates, 3 elevation, 4 outfall and 5 active
         self.swmm_node_info = self.swmm.nodes_info.to_numpy()
         self.swmm_node_info = np.column_stack(
             (self.swmm_node_info[:, 0], self.swmm_node_info[:, 1],
@@ -56,6 +63,14 @@ class csc:
             (self.swmm_node_info[:, 0]-self.rel_diff[0]) / self.caffe.length)
         self.swmm_node_info[:, 1] = np.int_(
             (self.rel_diff[1]-self.swmm_node_info[:, 1]) / self.caffe.length)
+
+        if self.active_nodes.size > 0:
+            active_nodes = np.isin(self.swmm.node_list, self.active_nodes)
+        else:
+            active_nodes = np.ones((len(self.swmm.node_list)), dtype=bool)
+
+        self.swmm_node_info = np.column_stack(
+            (self.swmm_node_info, active_nodes))
 
         # when a DEM loaded coordinate system is reverse (Rasterio)
         self.swmm_node_info[:, [0, 1]] = self.swmm_node_info[:, [1, 0]]
@@ -216,8 +231,9 @@ class csc:
                                                / self.caffe.cell_area))
                 self.caffe.ExcessVolumeMapArray(floodvolume, True)
 
+            tmp = flooded_nodes_flowrates * self.swmm_node_info[:, 4]
             nonflooded_nodes = self.swmm_node_info[np.logical_not(
-                flooded_nodes_flowrates > 0), 0:2]
+                tmp > 0), 0:2]
 
             # to run caffe without open boundries for weir equation calculations
             if self.weir_approach:

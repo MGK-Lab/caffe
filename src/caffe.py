@@ -15,7 +15,7 @@ class caffe():
         self.DEM, self.ClosedBC, self.bounds = util.DEMRead(dem_file)
         self.DEMshape = self.DEM.shape
 
-        self.DEM[self.ClosedBC==True]=np.amax(self.DEM)
+        self.DEM[self.ClosedBC == True] = np.amax(self.DEM)
 
         # to initialise a CAffe model
         self.BCtol = 1e9
@@ -75,6 +75,7 @@ class caffe():
     def LoadInitialExcessWaterDepthFile(self, wd_file):
         self.user_waterdepth_file = True
         self.excess_volume_map, tmp, bounds = util.DEMRead(wd_file)
+        self.excess_volume_map = self.excess_volume_map * ~tmp
 
     def LoadInitialExcessWaterDepthArray(self, wd_np):
         self.user_waterdepth_file = True
