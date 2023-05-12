@@ -4,6 +4,8 @@ import time
 import sys
 import util
 import os
+from dateutil.parser import parse
+import pandas as pd
 
 
 class caffe():
@@ -12,15 +14,15 @@ class caffe():
         print("\n", time.ctime(), "\n")
 
         self.dem_file = dem_file
-        self.DEM, self.ClosedBC, self.bounds = util.DEMRead(dem_file)
+        self.DEM, self.ClosedBC, self.bounds, self.length = util.RasterToArray(
+            dem_file)
         self.DEMshape = self.DEM.shape
 
         self.DEM[self.ClosedBC == True] = np.amax(self.DEM)
 
         # to initialise a CAffe model
         self.BCtol = 1e9
-        self.length = 1
-        self.cell_area = 1
+        self.cell_area = self.length**2
         self.vol_cutoff = 0.1
         self.setConstants_has_been_called = False
         self.water_levels = np.copy(self.DEM).astype(np.double)
@@ -33,6 +35,11 @@ class caffe():
         self.outputs_name = name[-1] + "_out"
         self.CBC_cells = np.array([])
         self.OBC_cells = np.array([])
+        self.start_date_time = None
+        self.end_date_time = None
+        self.initialised = False
+        self.RainOnGrid = False
+        self.rain = None
 
     def CloseSimulation(self):
         print("\n .....closing and reporting the CA-ffé simulation.....")
@@ -43,11 +50,13 @@ class caffe():
     def setOutputPath(self, fp):
         self.outputs_path = fp
 
-    def setSpreadVolumeCutoff(self, vc):
-        self.vol_cutoff = vc
-
     def setOutputName(self, fn):
         self.outputs_name = fn
+
+    def set_simulation_dates(self, start_date_time, end_date_time):
+        # the format should be "year-month-day hour:minute"
+        self.start_date_time = parse(start_date_time)
+        self.end_date_time = parse(end_date_time)
 
     def setConstants(self, hf, ic, EVt):
         self.setConstants_has_been_called = True
@@ -56,6 +65,30 @@ class caffe():
         # Second CAffe model parameter selected by user
         self.ic = ic
         self.EVt = EVt
+
+    def readRainfall(self, filename, type='depth'):
+        # the first data should be zero in rain column
+        # the depth should be in mm while intensity in mm/hr
+
+        self.RainOnGrid = True
+        intensity = False
+        if type.lower() == 'intensity':
+            intensity = True
+
+        data = pd.read_csv(filename, parse_dates=[0], dtype={1: float})
+        data.columns = ['Time', 'Rain']  # Renaming columns
+        time_diff = data['Time'].diff().dt.total_seconds()
+        time_diff[0] = 0
+        data['TimeDiff'] = time_diff
+
+        if intensity:
+            data['Rain'] = data.apply(
+                lambda row: row['Rain']*row['TimeDiff']/3600, axis=1)
+
+        self.rain = data
+
+    def setSpreadVolumeCutoff(self, vc):
+        self.vol_cutoff = vc
 
     def setDEMCellSize(self, length):
         self.length = length
@@ -74,7 +107,7 @@ class caffe():
 
     def LoadInitialExcessWaterDepthFile(self, wd_file):
         self.user_waterdepth_file = True
-        self.excess_volume_map, tmp, bounds = util.DEMRead(wd_file)
+        self.excess_volume_map, tmp, bounds = util.RasterToArray(wd_file)
         self.excess_volume_map = self.excess_volume_map * ~tmp
 
     def LoadInitialExcessWaterDepthArray(self, wd_np):
@@ -122,12 +155,29 @@ class caffe():
         for r in self.OBC_cells:
             self.OpenBC[r[0], r[1]] = False
 
-    def RunSimulation(self):
-        self.begining = time.time()
+    def InitialChecks(self):
         if not self.setConstants_has_been_called:
             sys.exit(
                 "CA-ffé constants were not set by the user, use setConstants",
                 " method and try again")
+
+        if self.RainOnGrid:
+            if self.start_date_time <= self.rain['Time'].iloc[0]:
+                self.start_date_time = self.rain['Time'].iloc[0]
+            else:
+                sys.exit(
+                    "The simulation start time is after the begining of the rain")
+
+            if not self.end_date_time > self.rain['Time'].iloc[-1]:
+                sys.exit(
+                    "The simulation end time is before the end of the rain")
+
+        self.initialised = True
+
+    def RunSimulation(self):
+        self.begining = time.time()
+        if not self.initialised:
+            self.InitialChecks()
 
         if self.user_waterdepth_file:
             self.excess_total_volume = np.sum(
@@ -201,11 +251,12 @@ class caffe():
             os.mkdir(self.outputs_path)
 
         fn = self.outputs_path + self.outputs_name + '_wl.tif'
-        util.arraytoRasterIO(self.water_levels, self.dem_file, fn)
+        util.array_to_raster(self.water_levels, fn, self.dem_file)
 
+        mask = np.where(self.water_depths == 0, True, False)
         fn = self.outputs_path + self.outputs_name + '_wd.tif'
-        util.arraytoRasterIO(self.water_depths, self.dem_file, fn)
+        util.array_to_raster(self.water_depths, fn, self.dem_file, mask)
 
+        mask = np.where(self.max_water_depths == 0, True, False)
         fn = self.outputs_path + self.outputs_name + '_mwd.tif'
-        util.arraytoRasterIO(self.max_water_depths, self.dem_file, fn)
-        util.arraytoRasterIO(self.max_water_depths, self.dem_file, fn)
+        util.array_to_raster(self.max_water_depths, fn, self.dem_file)

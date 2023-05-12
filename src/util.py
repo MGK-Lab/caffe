@@ -5,20 +5,29 @@ import numpy as np
 import warnings
 
 
-def arraytoRasterIO(array, existingraster, dst_filename):
-    """this function is used to save a 2D numpy array as a GIS raster map"""
-    with rio.open(existingraster) as src:
-        naip_meta = src.profile
-        mask = src.dataset_mask()
-
-    naip_meta['count'] = 1
-    naip_meta['nodata'] = -999
+def ArrayToRaster(arr, filename, sample_raster, mask=None):
+    # Ignore the warning for not having a georeference
     warnings.filterwarnings(
         "ignore", category=rio.errors.NotGeoreferencedWarning)
 
-    # write your the ndvi raster object
-    with rio.open(dst_filename, 'w', **naip_meta) as dst:
-        dst.write(np.ma.masked_array(array, mask), 1)
+    # Load sample raster metadata
+    with rio.open(sample_raster, 'r') as src:
+        meta = src.meta.copy()
+        if mask is None:
+            mask = src.read_masks(1).astype(bool)
+
+    # Update metadata for output raster
+    meta.update({
+        'count': 1,
+        'dtype': arr.dtype,
+        'nodata': -9999,  # set nodata value here
+    })
+
+    # Create output raster file
+    with rio.open(filename, 'w', **meta) as dst:
+        # Mask array and write to raster file
+        arr_masked = np.where(mask, arr, meta['nodata'])
+        dst.write(arr_masked, 1)
 
 
 def VelocitytoRasterIO(velx, vely, existingraster, dst_filename):
@@ -39,29 +48,31 @@ def VelocitytoRasterIO(velx, vely, existingraster, dst_filename):
         dst.write(np.ma.masked_array(vely, mask), 2)
 
 
-def DEMRead(dem_file):
-    """this function is used to read digital elevation model (DEM file) of
-    the 1st layer (band = 1)"""
+def RasterToArray(dem_file):
+    # Ignore the warning for not having a georeference
     warnings.filterwarnings(
         "ignore", category=rio.errors.NotGeoreferencedWarning)
 
-    src = rio.open(dem_file)
-    band = 1
-    DEM = src.read(band)
-    msk = src.read_masks(band)
-    DEM = DEM.astype(np.double)
-    bounds = np.zeros(4)
-    bounds = [src.bounds.left, src.bounds.top,
-              src.bounds.right, src.bounds.bottom]
+    # Open the DEM file
+    with rio.open(dem_file) as src:
+        DEM = src.read(1)
+        mask = src.read_masks(1)
+        bounds = [src.bounds.left, src.bounds.top,
+                  src.bounds.right, src.bounds.bottom]
+        geotransform = src.transform
+        cell_size = geotransform[0]
 
-    mask = np.zeros_like(DEM, dtype=bool)
-    mask[msk == 0] = True
+    DEM = DEM.astype(np.double)
+    bounds = np.array(bounds)
+    mask = mask.astype(bool)
+
+    # Create a wall all around the domain
     mask[0, :] = True
     mask[-1, :] = True
     mask[:, 0] = True
     mask[:, -1] = True
 
-    return DEM, mask, bounds
+    return DEM, mask, bounds, cell_size
 
 
 def DEMGenerate(npa, dst_filename, mask=None):
