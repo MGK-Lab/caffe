@@ -1,5 +1,6 @@
 import caffe_core
 import numpy as np
+import math
 import time
 import sys
 import util
@@ -14,25 +15,27 @@ class caffe():
         print("\n", time.ctime(), "\n")
 
         self.dem_file = dem_file
-        self.DEM, self.ClosedBC, self.bounds, self.length = util.RasterToArray(
+        self.DEM, self.mask_dem, self.bounds, self.length = util.RasterToArray(
             dem_file)
+        self.ClosedBC = self.mask_dem
         self.DEMshape = self.DEM.shape
 
         self.DEM[self.ClosedBC == True] = np.amax(self.DEM)
 
         # to initialise a CAffe model
-        self.BCtol = 1e9
+        self.BCtol = 1.0e6
         self.cell_area = self.length**2
         self.vol_cutoff = 0.1
         self.setConstants_has_been_called = False
         self.water_levels = np.copy(self.DEM).astype(np.double)
+        self.water_depths = np.zeros_like(self.DEM, dtype=np.double)
         self.excess_volume_map = np.zeros_like(self.DEM, dtype=np.double)
         self.OpenBC = np.zeros_like(self.DEM, dtype=np.bool)
-        self.user_waterdepth_file = False
+        self.waterdepth_excess = False
         self.outputs_path = "./"
-        name = dem_file.split('.')
-        name = name[1].split('/')
-        self.outputs_name = name[-1] + "_out"
+        name = dem_file.split('/')
+        name = name[-1].split('.')
+        self.outputs_name = name[0] + "_out"
         self.CBC_cells = np.array([])
         self.OBC_cells = np.array([])
         self.start_date_time = None
@@ -66,7 +69,7 @@ class caffe():
         self.ic = ic
         self.EVt = EVt
 
-    def readRainfall(self, filename, type='depth'):
+    def readRainfallSeries(self, filename, type='depth'):
         # the first data should be zero in rain column
         # the depth should be in mm while intensity in mm/hr
 
@@ -75,28 +78,29 @@ class caffe():
         if type.lower() == 'intensity':
             intensity = True
 
-        data = pd.read_csv(filename, parse_dates=[0], dtype={1: float})
+        data = pd.read_csv(filename, parse_dates=[
+                           0], dtype={1: float}, header=None)
         data.columns = ['Time', 'Rain']  # Renaming columns
         time_diff = data['Time'].diff().dt.total_seconds()
-        time_diff[0] = 0
         data['TimeDiff'] = time_diff
 
         if intensity:
             data['Rain'] = data.apply(
                 lambda row: row['Rain']*row['TimeDiff']/3600, axis=1)
 
+        data['Rain'] = data.apply(lambda row: row['Rain']/1000, axis=1)
         self.rain = data
 
-    def setSpreadVolumeCutoff(self, vc):
-        self.vol_cutoff = vc
-
     def setDEMCellSize(self, length):
+        # the cell size is extrated from the opened DEM file
+        # if the user likes to set it manually, this function should be used
         self.length = length
         self.cell_area = length**2
 
-    def ExcessVolumeMapArray(self, EVM_np, add=False):
-        EVM_np[:, 0] = EVM_np[:, 0] / self.length
-        EVM_np[:, 1] = EVM_np[:, 1] / self.length
+    def ExcessVolumeArray(self, EVM_np, add=False):
+        # this function gets an array with 3 columns: x coord, y coord, volume
+        # note: it uses local coordinates of the array not Georeference
+        EVM_np = EVM_np / self.length
         for r in EVM_np:
             if add:
                 self.excess_volume_map[int(
@@ -105,16 +109,19 @@ class caffe():
                 self.excess_volume_map[int(
                     np.ceil(r[0])), int(np.ceil(r[1]))] = r[2]
 
-    def LoadInitialExcessWaterDepthFile(self, wd_file):
-        self.user_waterdepth_file = True
-        self.excess_volume_map, tmp, bounds = util.RasterToArray(wd_file)
-        self.excess_volume_map = self.excess_volume_map * ~tmp
+    def ExcessWaterDepthFile(self, wd_file):
+        # this takes water depths from a file to spread
+        self.waterdepth_excess = True
+        self.excess_volume_map, mask, tmp1, tmp2 = util.RasterToArray(wd_file)
 
-    def LoadInitialExcessWaterDepthArray(self, wd_np):
-        self.user_waterdepth_file = True
+    def ExcessWaterDepthArray(self, wd_np):
+        # this takes water depths from an array to spread
+        self.waterdepth_excess = True
         self.excess_volume_map = wd_np
 
-    def OpenBCMapArray(self, OBCM_np):
+    def OpenBCArray(self, OBCM_np):
+        # it takes an array of x and y coords (local) to create a raster-like
+        # array of open boundary cells (as big wells)
         self.OBC_cells = np.zeros_like(OBCM_np, dtype=np.int)
         OBCM_np = OBCM_np / self.length
 
@@ -125,10 +132,11 @@ class caffe():
             self.OBC_cells[i, 1] = int(np.ceil(r[1]))
             i += 1
 
-    def ClosedBCMapArray(self, CBCM_np):
+    def ClosedBCArray(self, CBCM_np):
+        # it takes an array of x and y coords (local) to create a raster-like
+        # array of closed boundary cells (as big spikes)
         self.CBC_cells = np.zeros_like(CBCM_np, dtype=np.int)
-        CBCM_np[:, 0] = CBCM_np[:, 0] / self.length
-        CBCM_np[:, 1] = CBCM_np[:, 1] / self.length
+        CBCM_np = CBCM_np / self.length
 
         i = 0
         for r in CBCM_np:
@@ -138,14 +146,18 @@ class caffe():
             i += 1
 
     def SetBCs(self):
+        # it modified the defined boundary cells' elevation
         self.water_levels[self.ClosedBC] += self.BCtol
         self.water_levels[self.OpenBC] -= self.BCtol
 
     def ResetBCs(self):
+        # it restore boundary cells' elevation to normal
         self.water_levels[self.ClosedBC] -= self.BCtol
         self.water_levels[self.OpenBC] += self.BCtol
 
     def Reset_WL_EVM(self):
+        # it resets water levels and excess volume map and it also removes
+        # defined boundary cells (closed and open) from the lists
         self.water_levels = np.copy(self.DEM).astype(np.double)
         self.excess_volume_map = np.zeros_like(self.DEM, dtype=np.double)
 
@@ -156,10 +168,17 @@ class caffe():
             self.OpenBC[r[0], r[1]] = False
 
     def InitialChecks(self):
+        # any initial checks should be performed here
         if not self.setConstants_has_been_called:
             sys.exit(
                 "CA-ffé constants were not set by the user, use setConstants",
                 " method and try again")
+
+        if ((self.start_date_time == None or self.start_date_time == None) and self.RainOnGrid):
+            self.start_date_time = self.rain['Time'].iloc[0]
+            self.end_date_time = self.rain['Time'].iloc[-1]
+            print(
+                "\nWarning: simulation times were not set, so the rain times were used instead\n")
 
         if self.RainOnGrid:
             if self.start_date_time <= self.rain['Time'].iloc[0]:
@@ -168,7 +187,7 @@ class caffe():
                 sys.exit(
                     "The simulation start time is after the begining of the rain")
 
-            if not self.end_date_time > self.rain['Time'].iloc[-1]:
+            if not self.end_date_time >= self.rain['Time'].iloc[-1]:
                 sys.exit(
                     "The simulation end time is before the end of the rain")
 
@@ -179,32 +198,35 @@ class caffe():
         if not self.initialised:
             self.InitialChecks()
 
-        if self.user_waterdepth_file:
-            self.excess_total_volume = np.sum(
-                self.excess_volume_map) * self.cell_area
-            print("total volume to be spread (m3) =", self.excess_total_volume)
+        # it prepares excess_water_column_map array based on input type
+        if self.waterdepth_excess:
             self.excess_water_column_map = self.excess_volume_map
         else:
-            self.excess_total_volume = np.sum(self.excess_volume_map)
-            print("total volume to be spread (m3) =", self.excess_total_volume)
             self.excess_water_column_map = self.excess_volume_map / self.cell_area
 
-        # CAffe_engine works with 1D arrays to provide faster simulations
+        self.excess_total_volume = np.sum(
+            self.excess_water_column_map) * self.cell_area
+        print("total volume to be spread (m3) =", self.excess_total_volume)
+
+        # it avoids decimal rounding otherwise a very big value would be used
+        self.BCtol = math.ceil(self.excess_total_volume / self.cell_area)
         self.SetBCs()
-        self.ClosedBC = self.ClosedBC.ravel()
+
+        # CAffe_engine works with 1D arrays to provide faster simulations
+        # all 2D arrays are converted to 1D
+        ClosedBC = self.ClosedBC.ravel()
         self.excess_water_column_map = self.excess_water_column_map.ravel()
         self.water_levels = self.water_levels.ravel()
 
         self.max_f = np.zeros_like(
             self.excess_water_column_map, dtype=np.double)
 
-        caffe_core.CAffe_engine(self.water_levels, self.ClosedBC,
+        caffe_core.CAffe_engine(self.water_levels, ClosedBC,
                                 self.excess_water_column_map,
                                 self.max_f, np.asarray(self.DEMshape),
                                 self.cell_area, self.ic, self.hf, self.EVt,
                                 self.vol_cutoff)
 
-        self.ClosedBC = self.ClosedBC.reshape(self.DEMshape)
         self.water_levels = self.water_levels.reshape(self.DEMshape)
         self.ResetBCs()
         self.water_depths = self.water_levels - self.DEM
@@ -217,6 +239,23 @@ class caffe():
 
         print("\nSimulation finished in", (time.time() - self.begining),
               "seconds")
+
+    def RunSimulationROG(self):
+        self.waterdepth_excess = True
+        rog_arr = np.ones_like(self.DEM) * ~self.mask_dem
+        name = self.outputs_name
+        print(np.sum(rog_arr))
+
+        for i in range(1, len(self.rain)):
+            print("\nRain time: ", self.rain['Time'].iloc[i])
+            self.excess_volume_map = self.rain['Rain'].iloc[i] * \
+                rog_arr + self.water_depths
+            self.RunSimulation()
+            self.ReportScreen()
+            self.outputs_name = name + "_" + \
+                self.rain['Time'].iloc[i].strftime('%Y-%m-%d %H:%M:%S')
+            self.ReportFile()
+            self.Reset_WL_EVM()
 
     def ReportScreen(self):
         indices = np.logical_and(self.ClosedBC == False, self.OpenBC == False)
@@ -250,13 +289,24 @@ class caffe():
         if not os.path.exists(self.outputs_path):
             os.mkdir(self.outputs_path)
 
+        indices = np.logical_and(self.ClosedBC == False, self.OpenBC == False)
+        indices = ~indices
+
         fn = self.outputs_path + self.outputs_name + '_wl.tif'
-        util.array_to_raster(self.water_levels, fn, self.dem_file)
+        wl = self.water_levels
+        wl[indices] = self.DEM[indices]
+        util.ArrayToRaster(wl, fn, self.dem_file)
 
-        mask = np.where(self.water_depths == 0, True, False)
+        wd = self.water_depths
+        wd[indices] = 0
+        mask = np.where(wd == 0, True, False)
+        print(np.sum(wd), " ", np.sum(mask))
         fn = self.outputs_path + self.outputs_name + '_wd.tif'
-        util.array_to_raster(self.water_depths, fn, self.dem_file, mask)
+        util.ArrayToRaster(wd, fn, self.dem_file, ~mask)
 
-        mask = np.where(self.max_water_depths == 0, True, False)
+        mwd = self.max_water_depths
+        mwd[indices] = 0
+        mask = np.where(mwd == 0, True, False)
+        print(np.sum(mwd), " ", np.sum(mask))
         fn = self.outputs_path + self.outputs_name + '_mwd.tif'
-        util.array_to_raster(self.max_water_depths, fn, self.dem_file)
+        util.ArrayToRaster(mwd, fn, self.dem_file, ~mask)

@@ -64,7 +64,7 @@ def RasterToArray(dem_file):
 
     DEM = DEM.astype(np.double)
     bounds = np.array(bounds)
-    mask = mask.astype(bool)
+    mask = ~mask.astype(bool)
 
     # Create a wall all around the domain
     mask[0, :] = True

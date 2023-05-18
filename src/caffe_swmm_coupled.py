@@ -204,6 +204,7 @@ class csc:
         for step in self.swmm.sim:
             print(Fore.GREEN + "SWMM @ "
                   + str(self.swmm.sim.current_time) + Style.RESET_ALL + "\n")
+            # save all times in an array
             self.time = np.append(self.time, self.swmm.sim.current_time)
             temp = np.array([0, 0], dtype=np.double)
 
