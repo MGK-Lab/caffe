@@ -56,7 +56,7 @@ class caffe():
     def setOutputName(self, fn):
         self.outputs_name = fn
 
-    def set_simulation_dates(self, start_date_time, end_date_time):
+    def setSimulationDates(self, start_date_time, end_date_time):
         # the format should be "year-month-day hour:minute"
         self.start_date_time = parse(start_date_time)
         self.end_date_time = parse(end_date_time)
@@ -109,12 +109,12 @@ class caffe():
                 self.excess_volume_map[int(
                     np.ceil(r[0])), int(np.ceil(r[1]))] = r[2]
 
-    def ExcessWaterDepthFile(self, wd_file):
+    def ExcessWaterDepthRasterFile(self, wd_file):
         # this takes water depths from a file to spread
         self.waterdepth_excess = True
         self.excess_volume_map, mask, tmp1, tmp2 = util.RasterToArray(wd_file)
 
-    def ExcessWaterDepthArray(self, wd_np):
+    def ExcessWaterDepthRaster(self, wd_np):
         # this takes water depths from an array to spread
         self.waterdepth_excess = True
         self.excess_volume_map = wd_np
@@ -300,13 +300,11 @@ class caffe():
         wd = self.water_depths
         wd[indices] = 0
         mask = np.where(wd == 0, True, False)
-        print(np.sum(wd), " ", np.sum(mask))
         fn = self.outputs_path + self.outputs_name + '_wd.tif'
         util.ArrayToRaster(wd, fn, self.dem_file, ~mask)
 
         mwd = self.max_water_depths
         mwd[indices] = 0
         mask = np.where(mwd == 0, True, False)
-        print(np.sum(mwd), " ", np.sum(mask))
         fn = self.outputs_path + self.outputs_name + '_mwd.tif'
         util.ArrayToRaster(mwd, fn, self.dem_file, ~mask)
