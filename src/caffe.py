@@ -44,10 +44,10 @@ class caffe():
         self.RainOnGrid = False
         self.rain = None
 
-    def CloseSimulation(self):
+    def CloseSimulation(self, name=None):
         print("\n .....closing and reporting the CA-ffé simulation.....")
         self.ReportScreen()
-        self.ReportFile()
+        self.ReportFile(name)
         print("\n", time.ctime(), "\n")
 
     def setOutputPath(self, fp):
@@ -288,14 +288,16 @@ class caffe():
         print("Left volume at Open BC:       ", np.sum(
             self.water_depths[self.OpenBC]) * self.cell_area)
 
-    def ReportFile(self):
+    def ReportFile(self, name=None):
         if not os.path.exists(self.outputs_path):
             os.mkdir(self.outputs_path)
+        if name == None:
+            name == self.outputs_name
 
         indices = np.logical_and(self.ClosedBC == False, self.OpenBC == False)
         indices = ~indices
 
-        fn = self.outputs_path + self.outputs_name + '_wl.tif'
+        fn = self.outputs_path + name + '_wl.tif'
         wl = self.water_levels
         wl[indices] = self.DEM[indices]
         util.ArrayToRaster(wl, fn, self.dem_file)
@@ -303,11 +305,11 @@ class caffe():
         wd = self.water_depths
         wd[indices] = 0
         mask = np.where(wd == 0, True, False)
-        fn = self.outputs_path + self.outputs_name + '_wd.tif'
+        fn = self.outputs_path + name + '_wd.tif'
         util.ArrayToRaster(wd, fn, self.dem_file, ~mask)
 
         mwd = self.max_water_depths
         mwd[indices] = 0
         mask = np.where(mwd == 0, True, False)
-        fn = self.outputs_path + self.outputs_name + '_mwd.tif'
+        fn = self.outputs_path + name + '_mwd.tif'
         util.ArrayToRaster(mwd, fn, self.dem_file, ~mask)

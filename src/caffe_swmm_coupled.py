@@ -35,7 +35,6 @@ class csc:
     def LoadCaffe(self, DEM_file, hf, increment_constant, EV_threshold):
         self.caffe = caffe(DEM_file)
         self.caffe.setConstants(hf, increment_constant, EV_threshold)
-        self.caffe_output_name = self.caffe.outputs_name
 
     def LoadSwmm(self, SWMM_inp):
         self.swmm = swmm(SWMM_inp)
@@ -167,7 +166,6 @@ class csc:
         print("\n Duration: ", time.time()-self.t, "\n")
 
     def RunMulti_SWMMtoCaffe(self):
-        origin_name = self.caffe.outputs_name
         old_mwd = np.zeros_like(self.caffe.DEM, dtype=np.double)
 
         for step in self.swmm.sim:
@@ -176,14 +174,14 @@ class csc:
                 floodvolume = np.column_stack((self.swmm_node_info[:, 0:2]*self.caffe.length,
                                                np.transpose(floodvolume)*self.IntTimeStep*self.volume_conversion))
                 self.caffe.ExcessVolumeArray(floodvolume, False)
-                self.caffe.outputs_name = origin_name + \
+                name = self.caffe.outputs_name + \
                     "_" + str(self.swmm.sim.current_time)
                 self.caffe.RunSimulation()
                 # to avoid loosing friction headloss
                 self.caffe.max_water_depths = np.maximum(
                     self.caffe.max_water_depths, old_mwd)
                 old_mwd = self.caffe.max_water_depths
-                self.caffe.CloseSimulation()
+                self.caffe.CloseSimulation(name)
 
         self.swmm.CloseSimulation()
         print(
@@ -192,8 +190,6 @@ class csc:
         print("\n Duration: ", time.time()-self.t, "\n")
 
     def Run_Caffe_BD_SWMM(self):
-
-        origin_name = self.caffe.outputs_name
         First_Step = True
         last_wd = np.array([[], []])
         self.exchange_amount = []
@@ -285,9 +281,9 @@ class csc:
                 # For reporting purpose, WD changed. BTW, it will be reseted in the next step
                 if np.sum(last_wd) > 0:
                     self.caffe.water_depths = last_wd
-                    self.caffe.outputs_name = origin_name + \
+                    name = self.caffe.outputs_name + \
                         "_" + str(self.swmm.sim.current_time)
-                    self.caffe.ReportFile()
+                    self.caffe.ReportFile(name)
 
             else:
                 last_wd = np.zeros_like(self.caffe.DEM, dtype=np.double)
@@ -298,7 +294,7 @@ class csc:
         self.swmm.CloseSimulation()
 
         # save all exchanges between models in a csv file including the exchange time
-        name = self.caffe.outputs_path + origin_name + '_exchange_report.csv'
+        name = self.caffe.outputs_path + self.caffe.outputs_name + '_exchange_report.csv'
         with open(name, 'w', newline='') as csvfile:
             writer = csv.writer(csvfile)
             for entry in self.exchange_amount:
