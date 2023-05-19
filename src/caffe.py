@@ -242,20 +242,23 @@ class caffe():
 
     def RunSimulationROG(self):
         self.waterdepth_excess = True
-        rog_arr = np.ones_like(self.DEM) * ~self.mask_dem
         name = self.outputs_name
-        print(np.sum(rog_arr))
 
         for i in range(1, len(self.rain)):
-            print("\nRain time: ", self.rain['Time'].iloc[i])
-            self.excess_volume_map = self.rain['Rain'].iloc[i] * \
-                rog_arr + self.water_depths
-            self.RunSimulation()
-            self.ReportScreen()
-            self.outputs_name = name + "_" + \
-                self.rain['Time'].iloc[i].strftime('%Y-%m-%d %H:%M:%S')
-            self.ReportFile()
+            self.StepSimulationROG(name, i)
             self.Reset_WL_EVM()
+            
+    def StepSimulationROG(self, name, i):
+        print("\nRain time: ", self.rain['Time'].iloc[i])
+        rog_arr = np.ones_like(self.DEM) * ~self.mask_dem
+        self.excess_volume_map = self.rain['Rain'].iloc[i] * \
+            rog_arr + self.water_depths
+        self.RunSimulation()
+        self.ReportScreen()
+        self.outputs_name = name + "_" + \
+            self.rain['Time'].iloc[i].strftime('%Y-%m-%d %H:%M:%S')
+        self.ReportFile()
+
 
     def ReportScreen(self):
         indices = np.logical_and(self.ClosedBC == False, self.OpenBC == False)
