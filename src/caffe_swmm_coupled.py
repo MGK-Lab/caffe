@@ -56,8 +56,10 @@ class csc:
         # coulumns are: 1 and 2 coordinates, 3 elevation, 4 outfall and 5 active
         self.swmm_node_info = self.swmm.nodes_info.to_numpy()
         self.swmm_node_info = np.column_stack(
-            (self.swmm_node_info[:, 0], self.swmm_node_info[:, 1],
-             self.swmm_node_info[:, 2] + self.swmm_node_info[:, 3], self.swmm_node_info[:, 4]))
+            (self.swmm_node_info[:, 0],
+             self.swmm_node_info[:, 1],
+             self.swmm_node_info[:, 2] + self.swmm_node_info[:, 3],
+             self.swmm_node_info[:, 4]))
         self.rel_diff = [self.caffe.bounds[0], self.caffe.bounds[1]]
         self.swmm_node_info[:, 0] = np.int_(
             (self.swmm_node_info[:, 0]-self.rel_diff[0]) / self.caffe.length)
@@ -109,8 +111,11 @@ class csc:
             if ((abs(r[2] - self.caffe.DEM[np.int_(r[0]), np.int_(r[1])])
                     > self.elv_dif * self.caffe.DEM[np.int_(r[0]), np.int_(r[1])]) and r[3] == False):
                 if not (self.recrusive_run):
-                    print(self.swmm.node_list[i], " diff = ", self.caffe.DEM[np.int_(
-                        r[0]), np.int_(r[1])]-r[2])
+                    print(
+                        self.swmm.node_list[i],
+                        " diff = ", self.caffe.DEM
+                        [np.int_(r[0]),
+                         np.int_(r[1])] - r[2])
                 self.failed_node_check = np.append(
                     self.failed_node_check, np.int_(i))
                 err = True
@@ -167,12 +172,23 @@ class csc:
 
     def RunMulti_SWMMtoCaffe(self):
         old_mwd = np.zeros_like(self.caffe.DEM, dtype=np.double)
+        total_surcharged = 0
+        self.exchange_amount = []
 
         for step in self.swmm.sim:
-            floodvolume = self.swmm.getNodesFlooding()
-            if (np.sum(floodvolume) > 0):
-                floodvolume = np.column_stack((self.swmm_node_info[:, 0:2]*self.caffe.length,
-                                               np.transpose(floodvolume)*self.IntTimeStep*self.volume_conversion))
+            print(Fore.GREEN + "SWMM @ "
+                  + str(self.swmm.sim.current_time) + Style.RESET_ALL + "\n")
+            floodvolume = self.swmm.getNodesFlooding()*self.IntTimeStep*self.volume_conversion
+            total_surcharged = np.sum(floodvolume)
+            self.exchange_amount.append(
+                [self.swmm.sim.current_time, total_surcharged])
+
+            if (total_surcharged > 0):
+                print(Fore.RED + "SWMM surcharged "
+                      + str(total_surcharged) + Style.RESET_ALL + "\n")
+
+                floodvolume = np.column_stack(
+                    (self.swmm_node_info[:, 0:2] * self.caffe.length, np.transpose(floodvolume)))
                 self.caffe.ExcessVolumeArray(floodvolume, False)
                 name = self.caffe.outputs_name + \
                     "_" + str(self.swmm.sim.current_time)
@@ -182,6 +198,15 @@ class csc:
                     self.caffe.max_water_depths, old_mwd)
                 old_mwd = self.caffe.max_water_depths
                 self.caffe.CloseSimulation(name)
+
+        # save all exchanges between models in a csv file including the exchange time
+        name = self.caffe.outputs_path + self.caffe.outputs_name + '_exchange_report.csv'
+        with open(name, 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            for entry in self.exchange_amount:
+                formatted_entry = [entry[0].strftime(
+                    '%Y-%m-%d %H:%M:%S')] + entry[1]
+                writer.writerow(formatted_entry)
 
         self.swmm.CloseSimulation()
         print(
@@ -195,6 +220,7 @@ class csc:
         self.exchange_amount = []
         total_surcharged = 0
         total_drained = 0
+        self.caffe.waterdepth_excess = True
 
         print(Fore.RED + "Starts running SWMM" + Style.RESET_ALL + "\n\n")
 
@@ -204,7 +230,6 @@ class csc:
 
             if First_Step:
                 First_Step = False
-                self.caffe.waterdepth_excess = True
             else:
                 self.caffe.Reset_WL_EVM()
                 self.caffe.ExcessWaterDepthRaster(last_wd)
@@ -220,9 +245,9 @@ class csc:
                 # convert node cells to node coordinates (local) for feeding ExcessVolumeArray
                 # since it reads the last water depth to initialise, the flood
                 # volumes needs to be converted to water depths
-                floodvolume = np.column_stack((self.swmm_node_info[:, 0:2]*self.caffe.length,
-                                               flooded_nodes_flowrates
-                                               / self.caffe.cell_area))
+                floodvolume = np.column_stack(
+                    (self.swmm_node_info[:, 0: 2] * self.caffe.length,
+                     flooded_nodes_flowrates / self.caffe.cell_area))
                 self.caffe.ExcessVolumeArray(floodvolume, True)
 
             # extract active non-flooded nodes for setting as open BCs
@@ -230,14 +255,14 @@ class csc:
             nonflooded_nodes = np.where(
                 flooded_nodes_flowrates == 0, True, False)
             nonflooded_nodes = nonflooded_nodes * self.swmm_node_info[:, 4]
-            nonflooded_nodes_list = self.swmm_node_info[nonflooded_nodes >
-                                                        0, 0:2] * self.caffe.length
+            nonflooded_nodes_coords = self.swmm_node_info[nonflooded_nodes >
+                                                          0, 0:2] * self.caffe.length
 
             # to run caffe without open boundries for weir equation calculations
             if self.weir_approach:
                 caffecopy = deepcopy(self.caffe)
 
-            self.caffe.OpenBCArray(nonflooded_nodes_list)
+            self.caffe.OpenBCArray(nonflooded_nodes_coords)
 
             if (total_surcharged > 0 or np.sum(self.caffe.excess_volume_map) > 0):
 
@@ -272,7 +297,8 @@ class csc:
                             k += 1
                         j += 1
                     self.swmm.setNodesInflow(
-                        inflow * self.caffe.cell_area / self.IntTimeStep)
+                        inflow * self.caffe.cell_area / self.IntTimeStep /
+                        self.volume_conversion)
                     total_drained = np.sum(
                         inflow) * self.caffe.cell_area
                     print(Fore.BLUE + "\nCA-ffé drained "
@@ -332,3 +358,141 @@ class csc:
             return q
         else:
             return calcq_height
+
+    def Run_Caffe_BD_SWMM_ROG(self):
+        last_wd = np.array([[], []])
+        self.exchange_amount = []
+        total_surcharged = 0
+        total_drained = 0
+        self.caffe.waterdepth_excess = True
+        initial_interval = 60
+
+        # for fist time running caffe; a SWMM run will be done for initial_interval
+        #
+        First_Step = True
+        rain_step = 1
+        self.InteractionInterval(initial_interval)
+
+        for step in self.swmm.sim:
+
+            if First_Step:
+                First_Step = False
+                self.InteractionInterval(
+                    self.caffe.rain['TimeDiff'].iloc[rain_step] -
+                    initial_interval)
+                nonflooded_nodes = self.swmm_node_info[:, 4]
+                nonflooded_nodes_coords = self.swmm_node_info[nonflooded_nodes
+                                                              > 0, 0:2] * self.caffe.length
+            else:
+                print(
+                    Fore.GREEN + "SWMM @ " + str(self.swmm.sim.current_time) +
+                    Style.RESET_ALL + "\n")
+
+                # convert flood flowrate at each node to volume
+                flooded_nodes_flowrates = np.transpose(
+                    self.swmm.getNodesFlooding()) * self.IntTimeStep * self.volume_conversion
+                total_surcharged = np.sum(flooded_nodes_flowrates)
+
+                # extract active non-flooded nodes for setting as open BCs
+                # convert node cells to node coordinates (local) for feeding caffe.OpenBCArray
+                nonflooded_nodes = np.where(
+                    flooded_nodes_flowrates == 0, True, False)
+                nonflooded_nodes = nonflooded_nodes * self.swmm_node_info[:, 4]
+                nonflooded_nodes_coords = self.swmm_node_info[nonflooded_nodes >
+                                                              0, 0:2] * self.caffe.length
+
+                self.caffe.Reset_WL_EVM()
+                self.caffe.ExcessWaterDepthRaster(last_wd)
+
+                if total_surcharged > 0:
+                    print(Fore.RED + "SWMM surcharged "
+                          + str(total_surcharged) + Style.RESET_ALL + "\n")
+                    # convert node cells to node coordinates (local) for feeding ExcessVolumeArray
+                    # since it reads the last water depth to initialise, the flood
+                    # volumes needs to be converted to water depths
+                    floodvolume = np.column_stack(
+                        (self.swmm_node_info[:, 0: 2] * self.caffe.length,
+                         flooded_nodes_flowrates / self.caffe.cell_area))
+                    self.caffe.ExcessVolumeArray(floodvolume, True)
+
+                self.InteractionInterval(
+                    self.caffe.rain['TimeDiff'].iloc[rain_step])
+
+            print(
+                Fore.GREEN + "CA-ffé @ ", self.caffe.rain['Time'].iloc
+                [rain_step], Style.RESET_ALL + "\n\n")
+
+            self.caffe.OpenBCArray(nonflooded_nodes_coords)
+            name = self.caffe.StepSimulationROG(rain_step)
+            last_wd = self.caffe.water_depths
+
+            if (np.sum(last_wd) > 0):
+                j = 0
+                k = 0
+                inflow = np.zeros(self.swmm_node_info.shape[0])
+                inflow_raster = np.zeros_like(last_wd, dtype=np.double)
+                for i in nonflooded_nodes:
+                    if i == 1:
+                        x = int(self.caffe.OBC_cells[k, 0])
+                        y = int(self.caffe.OBC_cells[k, 1])
+
+                        inflow[j] = last_wd[x, y]
+
+                        inflow_raster[x, y] -= inflow[j]
+                        k += 1
+                    j += 1
+
+                self.swmm.setNodesInflow(
+                    inflow * self.caffe.cell_area / self.IntTimeStep / self.volume_conversion)
+                total_drained = np.sum(
+                    inflow) * self.caffe.cell_area
+                print(Fore.BLUE + "\nCA-ffé drained "
+                      + str(total_drained) + Style.RESET_ALL + "\n")
+
+                # For reporting purpose, WD changed. BTW, it will be reseted in the next step
+                self.caffe.water_depths = last_wd - inflow_raster
+                self.caffe.max_water_depths = self.caffe.max_water_depths - inflow_raster
+                name = name + "_swmm_" + str(self.swmm.sim.current_time)
+                self.caffe.ReportFile(name)
+
+            self.exchange_amount.append(
+                [self.swmm.sim.current_time, total_surcharged, total_drained])
+
+            rain_step += 1
+
+        #     # to run caffe without open boundries for weir equation calculations
+        #     if self.weir_approach:
+        #         caffecopy = deepcopy(self.caffe)
+
+        #     self.caffe.OpenBCArray(nonflooded_nodes_coords)
+
+        #     if (total_surcharged > 0 or np.sum(self.caffe.excess_volume_map) > 0):
+
+        #         if self.weir_approach:
+        #             sys.stdout = open(os.devnull, 'w')
+        #             caffecopy.RunSimulation()
+        #             # caffecopy.ReportScreen()
+        #             actual_wd = caffecopy.water_depths
+        #             sys.stdout = sys.__stdout__
+        #             del caffecopy
+
+        #         self.caffe.RunSimulation()
+        #         self.caffe.ReportScreen()
+
+        #     else:
+        #         last_wd = np.zeros_like(self.caffe.DEM, dtype=np.double)
+
+        self.swmm.CloseSimulation()
+
+        # save all exchanges between models in a csv file including the exchange time
+        name = self.caffe.outputs_path + self.caffe.outputs_name + '_exchange_report.csv'
+        with open(name, 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            for entry in self.exchange_amount:
+                formatted_entry = [entry[0].strftime(
+                    '%Y-%m-%d %H:%M:%S')] + entry[1:]
+                writer.writerow(formatted_entry)
+
+        print("\n .....finished bi-directional coupled SWMM & CA-ffé.....")
+        print("\n", time.ctime(), "\n")
+        print("\n Duration: ", time.time()-self.t, "\n")

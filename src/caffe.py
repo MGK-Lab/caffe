@@ -52,6 +52,8 @@ class caffe():
 
     def setOutputPath(self, fp):
         self.outputs_path = fp
+        if not os.path.exists(self.outputs_path):
+            os.mkdir(self.outputs_path)
 
     def setOutputName(self, fn):
         self.outputs_name = fn
@@ -242,38 +244,42 @@ class caffe():
 
     def RunSimulationROG(self):
         self.waterdepth_excess = True
-        name = self.outputs_name
 
         for i in range(1, len(self.rain)):
-            self.StepSimulationROG(name, i)
+            name = self.StepSimulationROG(name, i)
+            self.ReportFile(name)
             self.Reset_WL_EVM()
-            
-    def StepSimulationROG(self, name, i):
+
+    def StepSimulationROG(self, i):
         print("\nRain time: ", self.rain['Time'].iloc[i])
         rog_arr = np.ones_like(self.DEM) * ~self.mask_dem
         self.excess_volume_map = self.rain['Rain'].iloc[i] * \
             rog_arr + self.water_depths
         self.RunSimulation()
         self.ReportScreen()
-        self.outputs_name = name + "_" + \
+        name = self.outputs_name + "_rain_" + \
             self.rain['Time'].iloc[i].strftime('%Y-%m-%d %H:%M:%S')
-        self.ReportFile()
 
+        return name
 
     def ReportScreen(self):
         indices = np.logical_and(self.ClosedBC == False, self.OpenBC == False)
         print("\n")
         print("water depth (min, max):       ", np.min(
-            self.water_depths[indices]), ", ", np.max(self.water_depths[indices]))
+            self.water_depths[indices]),
+            ", ", np.max(self.water_depths[indices]))
 
-        print("max water depth (min, max):   ", np.min(self.max_water_depths[indices]),
-              ", ", np.max(self.max_water_depths[indices]))
+        print("max water depth (min, max):   ", np.min(
+            self.max_water_depths[indices]),
+            ", ", np.max(self.max_water_depths[indices]))
 
         print("water level (min, max):       ", np.min(
-            self.water_levels[indices]), ", ", np.max(self.water_levels[indices]))
+            self.water_levels[indices]),
+            ", ", np.max(self.water_levels[indices]))
 
-        print("max water level (min, max):   ", np.min(self.max_water_levels[indices]),
-              ", ", np.max(self.max_water_levels[indices]))
+        print("max water level (min, max):   ", np.min(
+            self.max_water_levels[indices]),
+            ", ", np.max(self.max_water_levels[indices]))
 
         print("Sum of total spreaded volume: ", np.sum(
             self.water_depths) * self.cell_area)
@@ -289,8 +295,6 @@ class caffe():
             self.water_depths[self.OpenBC]) * self.cell_area)
 
     def ReportFile(self, name=None):
-        if not os.path.exists(self.outputs_path):
-            os.mkdir(self.outputs_path)
         if name == None:
             name == self.outputs_name
 
