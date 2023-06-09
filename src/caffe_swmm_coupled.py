@@ -172,7 +172,6 @@ class csc:
 
     def RunMulti_SWMMtoCaffe(self):
         old_mwd = np.zeros_like(self.caffe.DEM, dtype=np.double)
-        total_surcharged = 0
         self.exchange_amount = []
 
         for step in self.swmm.sim:
@@ -205,7 +204,7 @@ class csc:
             writer = csv.writer(csvfile)
             for entry in self.exchange_amount:
                 formatted_entry = [entry[0].strftime(
-                    '%Y-%m-%d %H:%M:%S')] + entry[1]
+                    '%Y-%m-%d %H:%M:%S')] + entry[1:]
                 writer.writerow(formatted_entry)
 
         self.swmm.CloseSimulation()

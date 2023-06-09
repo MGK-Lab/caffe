@@ -16,6 +16,7 @@ if __name__ == "__main__":
     sim.setConstants(hf, increment_constant, EV_threshold)
     sim.ExcessVolumeArray(np.array([[499, 499, 10000]]))
     sim.OpenBCArray(np.array([[300, 300]]))
+    # sim.threads = 15
     sim.RunSimulation()
     sim.setOutputPath("./tests/")
     sim.CloseSimulation()

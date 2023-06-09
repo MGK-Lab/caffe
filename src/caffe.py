@@ -1,4 +1,5 @@
-import caffe_core
+import caffe_core as core_serial
+import caffe_core_parallel as core_parallel
 import numpy as np
 import math
 import time
@@ -43,6 +44,7 @@ class caffe():
         self.initialised = False
         self.RainOnGrid = False
         self.rain = None
+        self.threads = 0
 
     def CloseSimulation(self, name=None):
         print("\n .....closing and reporting the CA-ffé simulation.....")
@@ -102,7 +104,8 @@ class caffe():
     def ExcessVolumeArray(self, EVM_np, add=False):
         # this function gets an array with 3 columns: x coord, y coord, volume
         # note: it uses local coordinates of the array not Georeference
-        EVM_np = EVM_np / self.length
+        EVM_np[:, 0] = EVM_np[:, 0] / self.length
+        EVM_np[:, 1] = EVM_np[:, 1] / self.length
         for r in EVM_np:
             if add:
                 self.excess_volume_map[int(
@@ -223,11 +226,19 @@ class caffe():
         self.max_f = np.zeros_like(
             self.excess_water_column_map, dtype=np.double)
 
-        caffe_core.CAffe_engine(self.water_levels, ClosedBC,
-                                self.excess_water_column_map,
-                                self.max_f, np.asarray(self.DEMshape),
-                                self.cell_area, self.ic, self.hf, self.EVt,
-                                self.vol_cutoff)
+        if self.threads < 2:
+            print("Serial version used")
+            core_serial.CAffe_engine(
+                self.water_levels, ClosedBC, self.excess_water_column_map,
+                self.max_f, np.asarray(self.DEMshape),
+                self.cell_area, self.ic, self.hf, self.EVt, self.vol_cutoff)
+        else:
+            print("Parallel version used")
+            core_parallel.CAffe_engine(
+                self.water_levels, ClosedBC, self.excess_water_column_map,
+                self.max_f, np.asarray(self.DEMshape),
+                self.cell_area, self.ic, self.hf, self.EVt, self.vol_cutoff,
+                self.threads)
 
         self.water_levels = self.water_levels.reshape(self.DEMshape)
         self.ResetBCs()
@@ -296,7 +307,7 @@ class caffe():
 
     def ReportFile(self, name=None):
         if name == None:
-            name == self.outputs_name
+            name = self.outputs_name
 
         indices = np.logical_and(self.ClosedBC == False, self.OpenBC == False)
         indices = ~indices

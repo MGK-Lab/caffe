@@ -172,15 +172,15 @@ cpdef CAffe_engine(np.ndarray[np.double_t, ndim = 1] water_levels,
                               extra_volume_map[i] = 0.
 
           if iteration % 2000== 0:
-              printf("iteration %i\n", iteration)
-              printf("\tvolume spread [m3] = %.3f\n", volume_spread * cell_area)
+              printf("\niteration %i\n", iteration)
+              printf("spreaded volume [m3] = %.3f\n", volume_spread * cell_area)
 
           if total_vol - volume_spread * cell_area < vol_cutoff:
-              printf("iteration %i\n", iteration)
-              printf("\tvolume spread [m3] = %.3f\n", volume_spread * cell_area)
+              printf("\niteration %i\n", iteration)
+              printf("spreaded volume [m3] = %.3f\n", volume_spread * cell_area)
               terminate = 1
 
           iteration += 1
 
-    printf("iteration %i\n", iteration)
-    printf("\tvolume spread [m3] = %.3f\n", volume_spread * cell_area)
+    printf("\niteration %i\n", iteration)
+    printf("spreaded volume [m3] = %.3f\n", volume_spread * cell_area)
