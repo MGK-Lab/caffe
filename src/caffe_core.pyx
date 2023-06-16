@@ -18,24 +18,21 @@ cpdef CAffe_engine(np.ndarray[np.double_t, ndim = 1] water_levels,
                    double cell_area,
                    double increment_constant,
                    double hf,
-                   double EV_threshold,
-                   double vol_cutoff):
+                   double EV_threshold):
 
     cdef double friction_head_loss = 0
     cdef double minlevels, maxlevels, level_change,increase, deltav_total,\
-                levels_u, levels_d, levels_r, levels_l, sum_extra_volume_map, \
+                levels_u, levels_d, levels_r, levels_l, \
                 u, r, d, l, w_u, w_r, w_d, w_l, ev_increase, n_smaller
     cdef int terminate, iteration, i
     terminate = 0
     iteration = 1
-    cdef double start_t = time.time()
 
     cdef int loop_beg = 0
     cdef int loop_end = water_levels.size - 1
     cdef int row_len = DEMshape[1]
 
     cdef double volume_spread = 0.
-    cdef double total_vol = np.sum(extra_volume_map) * cell_area
 
     with nogil:
       while terminate == 0:
@@ -73,13 +70,13 @@ cpdef CAffe_engine(np.ndarray[np.double_t, ndim = 1] water_levels,
                       # to the lowest neighbour.
                       if extra_volume_map[i] < .01:
                           # find the lowest neighbour
-                          if u < minlevels + 0.00000000001:
+                          if    u < minlevels + 0.000000001:
                               extra_volume_map[i - row_len] += extra_volume_map[i]
-                          elif r < minlevels + 0.000000001:
+                          elif  r < minlevels + 0.000000001:
                               extra_volume_map[i + 1] += extra_volume_map[i]
-                          elif d < minlevels + 0.0000000001:
+                          elif  d < minlevels + 0.000000001:
                               extra_volume_map[i + row_len] += extra_volume_map[i]
-                          elif l < minlevels + 0.000000001:
+                          elif  l < minlevels + 0.000000001:
                               extra_volume_map[i - 1] += extra_volume_map[i]
 
                           extra_volume_map[i] = 0
@@ -174,11 +171,6 @@ cpdef CAffe_engine(np.ndarray[np.double_t, ndim = 1] water_levels,
           if iteration % 2000== 0:
               printf("\niteration %i\n", iteration)
               printf("spreaded volume [m3] = %.3f\n", volume_spread * cell_area)
-
-          if total_vol - volume_spread * cell_area < vol_cutoff:
-              printf("\niteration %i\n", iteration)
-              printf("spreaded volume [m3] = %.3f\n", volume_spread * cell_area)
-              terminate = 1
 
           iteration += 1
 

@@ -1,5 +1,4 @@
 import caffe_core as core_serial
-import caffe_core_parallel as core_parallel
 import numpy as np
 import math
 import time
@@ -8,6 +7,7 @@ import util
 import os
 from dateutil.parser import parse
 import pandas as pd
+import ctypes
 
 
 class caffe():
@@ -45,6 +45,28 @@ class caffe():
         self.RainOnGrid = False
         self.rain = None
         self.threads = 0
+
+        self.parallel_lib_path = './caffe_core_parallel.so'
+        self.lib = ctypes.CDLL(self.parallel_lib_path)
+
+        # Define the argument types for the C++ function for parallel computation
+        self.lib.CAffe_engine.argtypes = [
+            np.ctypeslib.ndpointer(
+                dtype=np.double, ndim=1, flags='C_CONTIGUOUS'),  # water_levels
+            np.ctypeslib.ndpointer(
+                dtype=np.bool, ndim=1, flags='C_CONTIGUOUS'),  # mask
+            np.ctypeslib.ndpointer(
+                dtype=np.double, ndim=1, flags='C_CONTIGUOUS'),  # extra_volume_map
+            np.ctypeslib.ndpointer(
+                dtype=np.double, ndim=1, flags='C_CONTIGUOUS'),  # max_f
+            np.ctypeslib.ndpointer(
+                dtype=np.int64, ndim=1, flags='C_CONTIGUOUS'),  # DEMshape
+            ctypes.c_double,  # cell_area
+            ctypes.c_double,  # increment_constant
+            ctypes.c_double,  # hf
+            ctypes.c_double,  # EV_threshold
+            ctypes.c_int     # threads
+        ]
 
     def CloseSimulation(self, name=None):
         print("\n .....closing and reporting the CA-ffé simulation.....")
@@ -231,14 +253,13 @@ class caffe():
             core_serial.CAffe_engine(
                 self.water_levels, ClosedBC, self.excess_water_column_map,
                 self.max_f, np.asarray(self.DEMshape),
-                self.cell_area, self.ic, self.hf, self.EVt, self.vol_cutoff)
+                self.cell_area, self.ic, self.hf, self.EVt)
         else:
             print("Parallel version used")
-            core_parallel.CAffe_engine(
+            self.lib.CAffe_engine(
                 self.water_levels, ClosedBC, self.excess_water_column_map,
                 self.max_f, np.asarray(self.DEMshape),
-                self.cell_area, self.ic, self.hf, self.EVt, self.vol_cutoff,
-                self.threads)
+                self.cell_area, self.ic, self.hf, self.EVt, self.threads)
 
         self.water_levels = self.water_levels.reshape(self.DEMshape)
         self.ResetBCs()

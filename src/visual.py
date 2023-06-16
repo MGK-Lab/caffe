@@ -9,7 +9,7 @@ import os
 
 
 def PlotDEM3d(dem_file, n=10, azdeg=290, altdeg=80, cmp_name='gist_earth'):
-    dem, mask, bounds = ut.DEMRead(dem_file)
+    dem, mask, bounds, l = ut.RasterToArray(dem_file)
 
     x = np.linspace(0, dem.shape[0], dem.shape[1])
     y = np.linspace(0, dem.shape[1], dem.shape[0])
@@ -38,7 +38,7 @@ def PlotDEM3d(dem_file, n=10, azdeg=290, altdeg=80, cmp_name='gist_earth'):
 
 
 def PlotDEM2d(dem_file, cmp_name='gist_earth'):
-    dem, mask, bounds = ut.DEMRead(dem_file)
+    dem, mask, bounds, l = ut.RasterToArray(dem_file)
     mask[dem <= 0] = True
     dem[mask == True] = np.amax(dem)
 
@@ -53,7 +53,8 @@ def PlotDEM2d(dem_file, cmp_name='gist_earth'):
     # plt.show()
 
 
-def AnimateDEMs3d(path, name, fps=5, n=10, azdeg=290, altdeg=80, cmp_name='gist_earth'):
+def AnimateDEMs3d(path, name, fps=5, n=10, azdeg=290, altdeg=80,
+                  cmp_name='gist_earth'):
 
     files = [os.path.join(dirpath, f) for (dirpath, dirnames, filenames)
              in os.walk(path) for f in filenames]
@@ -66,7 +67,7 @@ def AnimateDEMs3d(path, name, fps=5, n=10, azdeg=290, altdeg=80, cmp_name='gist_
     images = []
 
     for file in files:
-        dem, mask, bounds = ut.DEMRead(file)
+        dem, mask, bounds, l = ut.RasterToArray(dem_file)
 
         x = np.linspace(0, dem.shape[0], dem.shape[1])
         y = np.linspace(0, dem.shape[1], dem.shape[0])
@@ -96,7 +97,7 @@ def AnimateDEMs2d(path, name, fps=5, n=10, cmp_name='gist_earth'):
     images = []
 
     for file in files:
-        dem, mask, bounds = ut.DEMRead(file)
+        dem, mask, bounds, l = ut.RasterToArray(file)
         mask[dem <= 0] = True
         dem[mask == True] = 100
 
