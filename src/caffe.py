@@ -46,8 +46,14 @@ class caffe():
         self.rain = None
         self.threads = 0
 
-        self.parallel_lib_path = './caffe_core_parallel.so'
+    def EnableParallelRun(self, threads, libpath=''):
+        if libpath == '':
+            self.parallel_lib_path = './caffe_core_parallel.so'
+        else:
+            self.parallel_lib_path = libpath
+
         self.lib = ctypes.CDLL(self.parallel_lib_path)
+        self.threads = threads
 
         # Define the argument types for the C++ function for parallel computation
         self.lib.CAffe_engine.argtypes = [
