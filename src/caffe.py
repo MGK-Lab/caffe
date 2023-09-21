@@ -8,6 +8,7 @@ import os
 from dateutil.parser import parse
 import pandas as pd
 import ctypes
+from copy import deepcopy
 
 
 class caffe():
@@ -18,7 +19,7 @@ class caffe():
         self.dem_file = dem_file
         self.DEM, self.mask_dem, self.bounds, self.length = util.RasterToArray(
             dem_file)
-        self.ClosedBC = self.mask_dem
+        self.ClosedBC = deepcopy(self.mask_dem)
         self.DEMshape = self.DEM.shape
 
         self.DEM[self.ClosedBC == True] = np.amax(self.DEM)
@@ -28,7 +29,7 @@ class caffe():
         self.cell_area = self.length**2
         self.vol_cutoff = 0.1
         self.setConstants_has_been_called = False
-        self.water_levels = np.copy(self.DEM).astype(np.double)
+        self.water_levels = deepcopy(self.DEM)
         self.water_depths = np.zeros_like(self.DEM, dtype=np.double)
         self.excess_volume_map = np.zeros_like(self.DEM, dtype=np.double)
         self.OpenBC = np.zeros_like(self.DEM, dtype=np.bool)
@@ -150,7 +151,7 @@ class caffe():
     def ExcessWaterDepthRaster(self, wd_np):
         # this takes water depths from an array to spread
         self.waterdepth_excess = True
-        self.excess_volume_map = wd_np
+        self.excess_volume_map = deepcopy(wd_np)
 
     def OpenBCArray(self, OBCM_np):
         # it takes an array of x and y coords (local) to create a raster-like
@@ -191,7 +192,7 @@ class caffe():
     def Reset_WL_EVM(self):
         # it resets water levels and excess volume map and it also removes
         # defined boundary cells (closed and open) from the lists
-        self.water_levels = np.copy(self.DEM).astype(np.double)
+        self.water_levels = deepcopy(self.DEM)
         self.excess_volume_map = np.zeros_like(self.DEM, dtype=np.double)
 
         for r in self.CBC_cells:
@@ -233,7 +234,7 @@ class caffe():
 
         # it prepares excess_water_column_map array based on input type
         if self.waterdepth_excess:
-            self.excess_water_column_map = self.excess_volume_map
+            self.excess_water_column_map = deepcopy(self.excess_volume_map)
         else:
             self.excess_water_column_map = self.excess_volume_map / self.cell_area
 
@@ -340,17 +341,17 @@ class caffe():
         indices = ~indices
 
         fn = self.outputs_path + name + '_wl.tif'
-        wl = self.water_levels
+        wl = deepcopy(self.water_levels)
         wl[indices] = self.DEM[indices]
         util.ArrayToRaster(wl, fn, self.dem_file)
 
-        wd = self.water_depths
+        wd = deepcopy(self.water_depths)
         wd[indices] = 0
         mask = np.where(wd == 0, True, False)
         fn = self.outputs_path + name + '_wd.tif'
         util.ArrayToRaster(wd, fn, self.dem_file, ~mask)
 
-        mwd = self.max_water_depths
+        mwd = deepcopy(self.max_water_depths)
         mwd[indices] = 0
         mask = np.where(mwd == 0, True, False)
         fn = self.outputs_path + name + '_mwd.tif'

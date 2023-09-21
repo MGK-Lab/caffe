@@ -86,7 +86,7 @@ class csc:
 
         # plot SWMM nodes on DEM
         if self.plot_Node_DEM:
-            temp = self.caffe.DEM
+            temp = deepcopy(self.caffe.DEM)
             temp[self.caffe.ClosedBC == True] = np.max(temp)
             plt.imshow(temp, cmap='gray')
             plt.scatter(self.swmm_node_info[:, 1], self.swmm_node_info[:, 0])
@@ -124,7 +124,7 @@ class csc:
         if (err and not (self.recrusive_run)):
             print("The above SWMM junctions surface elevation have >",
                   self.elv_dif*100, "% difference with the provided DEM.\n")
-            temp = self.caffe.DEM
+            temp = deepcopy(self.caffe.DEM)
             temp[self.caffe.ClosedBC == True] = np.max(temp)
             plt.imshow(temp, cmap='gray')
             plt.scatter(self.swmm_node_info[self.failed_node_check, 1],
@@ -153,15 +153,16 @@ class csc:
         if not (self.recrusive_run):
             print("\nFor one-time one-way coupling of SWMM to Caffe apprach, SWMM model should generate a report for all nodes.")
             continue_choice = input("Do you want to continue? (yes/no): ")
-            if continue_choice.lower() != "yes":
+            if continue_choice.lower() not in ["yes", "y"]:
                 raise Exception("Program terminated to revise SWMM input file")
 
         self.swmm.sim.execute()
         floodvolume = self.swmm.Output_getNodesFlooding()
         # it is multiplied by DEM length as the caffe excess volume will get coordinates
         # not cell. swmm_node_info is already converted to cell location in NodeElvCoordChecks function
-        floodvolume = np.column_stack((self.swmm_node_info[:, 0:2]*self.caffe.length,
-                                       np.transpose(floodvolume*self.volume_conversion)))
+        floodvolume = np.column_stack(
+            (self.swmm_node_info[:, 0: 2] * self.caffe.length, np.transpose(
+                floodvolume * self.volume_conversion)))
 
         self.caffe.ExcessVolumeArray(floodvolume)
         self.caffe.RunSimulation()
@@ -193,9 +194,9 @@ class csc:
                     "_" + str(self.swmm.sim.current_time)
                 self.caffe.RunSimulation()
                 # to avoid loosing friction headloss
-                self.caffe.max_water_depths = np.maximum(
-                    self.caffe.max_water_depths, old_mwd)
-                old_mwd = self.caffe.max_water_depths
+                # self.caffe.max_water_depths = np.maximum(
+                #     self.caffe.max_water_depths, old_mwd)
+                # old_mwd = self.caffe.max_water_depths
                 self.caffe.CloseSimulation(name)
 
         # save all exchanges between models in a csv file including the exchange time
@@ -269,14 +270,14 @@ class csc:
                     sys.stdout = open(os.devnull, 'w')
                     caffecopy.RunSimulation()
                     # caffecopy.ReportScreen()
-                    actual_wd = caffecopy.water_depths
+                    actual_wd = deepcopy(caffecopy.water_depths)
                     sys.stdout = sys.__stdout__
                     del caffecopy
 
                 self.caffe.RunSimulation()
                 self.caffe.ReportScreen()
 
-                last_wd = self.caffe.water_depths
+                last_wd = deepcopy(self.caffe.water_depths)
                 if (np.sum(last_wd) > 0):
                     j = 0
                     k = 0
@@ -290,11 +291,12 @@ class csc:
                                 inflow[j] = self.MaxFlowrate(
                                     j, actual_wd[x, y], last_wd[x, y])
                             else:
-                                inflow[j] = last_wd[x, y]
+                                inflow[j] = deepcopy(last_wd[x, y])
 
-                            last_wd[x, y] -= inflow[j]
+                            last_wd[x, y] = last_wd[x, y] - inflow[j]
                             k += 1
                         j += 1
+
                     self.swmm.setNodesInflow(
                         inflow * self.caffe.cell_area / self.IntTimeStep /
                         self.volume_conversion)
@@ -305,7 +307,7 @@ class csc:
 
                 # For reporting purpose, WD changed. BTW, it will be reseted in the next step
                 if np.sum(last_wd) > 0:
-                    self.caffe.water_depths = last_wd
+                    self.caffe.water_depths = deepcopy(last_wd)
                     name = self.caffe.outputs_name + \
                         "_" + str(self.swmm.sim.current_time)
                     self.caffe.ReportFile(name)
@@ -423,7 +425,7 @@ class csc:
 
             self.caffe.OpenBCArray(nonflooded_nodes_coords)
             name = self.caffe.StepSimulationROG(rain_step)
-            last_wd = self.caffe.water_depths
+            last_wd = deepcopy(self.caffe.water_depths)
 
             if (np.sum(last_wd) > 0):
                 j = 0
@@ -435,9 +437,9 @@ class csc:
                         x = int(self.caffe.OBC_cells[k, 0])
                         y = int(self.caffe.OBC_cells[k, 1])
 
-                        inflow[j] = last_wd[x, y]
+                        inflow[j] = deepcopy(last_wd[x, y])
 
-                        inflow_raster[x, y] -= inflow[j]
+                        inflow_raster[x, y] = inflow_raster[x, y] - inflow[j]
                         k += 1
                     j += 1
 
