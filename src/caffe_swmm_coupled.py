@@ -218,8 +218,10 @@ class csc:
         print("\n Duration: ", time.time()-self.t, "\n")
 
     def Run_Caffe_BD_SWMM(self):
+        max_mwd = np.array([[], []])
+        max_wd = np.array([[], []])
+        max_wl = np.array([[], []])
         First_Step = True
-        last_wd = np.array([[], []])
         self.exchange_amount = []
         total_surcharged = 0
         total_drained = 0
@@ -235,7 +237,7 @@ class csc:
                 First_Step = False
             else:
                 self.caffe.Reset_WL_EVM()
-                self.caffe.ExcessWaterDepthRaster(last_wd)
+                self.caffe.ExcessWaterDepthRaster(self.caffe.water_depths)
 
             # convert flood flowrate at each node to volume
             flooded_nodes_flowrates = np.transpose(
@@ -280,11 +282,13 @@ class csc:
                 self.caffe.RunSimulation()
                 self.caffe.ReportScreen()
 
-                last_wd = deepcopy(self.caffe.water_depths)
-                if (np.sum(last_wd) > 0):
+                if (np.sum(self.caffe.water_depths) > 0):
                     j = 0
                     k = 0
                     inflow = np.zeros(self.swmm_node_info.shape[0])
+                    inflow_raster = np.zeros_like(
+                        self.caffe.water_depths, dtype=np.double)
+
                     for i in nonflooded_nodes:
                         if i == 1:
                             x = int(self.caffe.OBC_cells[k, 0])
@@ -292,11 +296,13 @@ class csc:
 
                             if self.weir_approach:
                                 inflow[j] = self.MaxFlowrate(
-                                    j, actual_wd[x, y], last_wd[x, y])
+                                    j, actual_wd[x, y],
+                                    self.caffe.water_depths[x, y])
                             else:
-                                inflow[j] = deepcopy(last_wd[x, y])
+                                inflow[j] = deepcopy(
+                                    self.caffe.water_depths[x, y])
 
-                            last_wd[x, y] = last_wd[x, y] - inflow[j]
+                            inflow_raster[x, y] = inflow[j]
                             k += 1
                         j += 1
 
@@ -309,20 +315,35 @@ class csc:
                           + str(total_drained) + Style.RESET_ALL + "\n")
 
                 # For reporting purpose, WD changed. BTW, it will be reseted in the next step
-                if np.sum(last_wd) > 0:
-                    self.caffe.water_depths = deepcopy(last_wd)
-                    name = self.caffe.outputs_name + \
-                        "_" + str(self.swmm.sim.current_time)
-                    if self.report_interval == True:
-                        self.caffe.ReportFile(name)
-
-            else:
-                last_wd = np.zeros_like(self.caffe.DEM, dtype=np.double)
+                self.caffe.water_depths -= inflow_raster
+                self.caffe.max_water_depths -= inflow_raster
+                self.caffe.water_levels -= inflow_raster
+                name = self.caffe.outputs_name + \
+                    "_" + str(self.swmm.sim.current_time)
+                if self.report_interval == True:
+                    self.caffe.ReportFile(name)
+                if self.report_max == True:
+                    if np.any(max_mwd) == False:
+                        max_mwd = deepcopy(self.caffe.max_water_depths)
+                        max_wd = deepcopy(self.caffe.water_depths)
+                        max_wl = deepcopy(self.caffe.water_levels)
+                    else:
+                        max_mwd = np.maximum(
+                            max_mwd, self.caffe.max_water_depths)
+                        max_wd = np.maximum(max_wd, self.caffe.water_depths)
+                        max_wl = np.maximum(max_wl, self.caffe.water_levels)
 
             self.exchange_amount.append(
                 [self.swmm.sim.current_time, total_surcharged, total_drained])
 
         self.swmm.CloseSimulation()
+
+        if self.report_max == True:
+            self.caffe.Reset_WL_EVM()
+            self.caffe.max_water_depths = deepcopy(max_mwd)
+            self.caffe.water_depths = deepcopy(max_wd)
+            self.caffe.water_levels = deepcopy(max_wl)
+            self.caffe.ReportFile(self.project_name + '_max_all')
 
         # save all exchanges between models in a csv file including the exchange time
         name = self.caffe.outputs_path + self.caffe.outputs_name + '_exchange_report.csv'
@@ -503,6 +524,7 @@ class csc:
         self.swmm.CloseSimulation()
 
         if self.report_max == True:
+            self.caffe.Reset_WL_EVM()
             self.caffe.max_water_depths = deepcopy(max_mwd)
             self.caffe.water_depths = deepcopy(max_wd)
             self.caffe.water_levels = deepcopy(max_wl)
