@@ -3,6 +3,7 @@ import rasterio as rio
 from rasterio.profiles import DefaultGTiffProfile
 import numpy as np
 import warnings
+import pandas as pd
 
 
 def ArrayToRaster(arr, filename, sample_raster, mask=None):
@@ -107,3 +108,25 @@ def InverseWeightedDistance(x, y, v, grid, power):
                 total = np.sum(1/(distance**power))
                 grid[i, j] = np.sum(v/(distance**power)/total)
     return grid
+
+
+def RainResample(file_name, target_name, target_intervals):
+
+    df = pd.read_csv(file_name, header=None, names=['time', 'height'])
+
+    df['time'] = pd.to_datetime(df['time'], format='%H:%M')
+
+    df = df.resample(
+        f'{target_intervals}T', on='time', origin='start').sum().reset_index()
+
+    # Adjust the time column to start from zero height
+    first_row = df.iloc[[0]]
+    first_row.iloc[0, 1] = 0
+    if df['height'].iloc[0] != 0:
+        df['time'] = df['time'] + \
+            pd.to_timedelta(f'{target_intervals} minutes')
+        df = pd.concat([first_row, df], ignore_index=True)
+
+    df['time'] = df['time'].dt.strftime('%H:%M')
+
+    df.to_csv(target_name, index=False, header=False)

@@ -403,7 +403,6 @@ class csc:
                                                               0, 0:2] * self.caffe.length
 
                 self.caffe.Reset_WL_EVM()
-                self.caffe.ExcessWaterDepthRaster(last_wd)
 
                 if total_surcharged > 0:
                     print(Fore.RED + "SWMM surcharged "
@@ -425,21 +424,21 @@ class csc:
 
             self.caffe.OpenBCArray(nonflooded_nodes_coords)
             name = self.caffe.StepSimulationROG(rain_step)
-            last_wd = deepcopy(self.caffe.water_depths)
 
-            if (np.sum(last_wd) > 0):
+            if (np.sum(self.caffe.water_depths) > 0):
                 j = 0
                 k = 0
                 inflow = np.zeros(self.swmm_node_info.shape[0])
-                inflow_raster = np.zeros_like(last_wd, dtype=np.double)
+                inflow_raster = np.zeros_like(
+                    self.caffe.water_depths, dtype=np.double)
                 for i in nonflooded_nodes:
                     if i == 1:
                         x = int(self.caffe.OBC_cells[k, 0])
                         y = int(self.caffe.OBC_cells[k, 1])
 
-                        inflow[j] = deepcopy(last_wd[x, y])
+                        inflow[j] = deepcopy(self.caffe.water_depths[x, y])
 
-                        inflow_raster[x, y] = inflow_raster[x, y] - inflow[j]
+                        inflow_raster[x, y] = inflow[j]
                         k += 1
                     j += 1
 
@@ -451,8 +450,8 @@ class csc:
                       + str(total_drained) + Style.RESET_ALL + "\n")
 
                 # For reporting purpose, WD changed. BTW, it will be reseted in the next step
-                self.caffe.water_depths = last_wd - inflow_raster
-                self.caffe.max_water_depths = self.caffe.max_water_depths - inflow_raster
+                self.caffe.water_depths -= inflow_raster
+                self.caffe.max_water_depths -= inflow_raster
                 name = name + "_swmm_" + str(self.swmm.sim.current_time)
                 self.caffe.ReportFile(name)
 
