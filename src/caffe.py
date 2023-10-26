@@ -49,7 +49,7 @@ class caffe():
 
     def EnableParallelRun(self, threads, libpath=''):
         if libpath == '':
-            self.parallel_lib_path = './caffe_core_parallel.so'
+            self.parallel_lib_path = 'caffe_core_parallel.so'
         else:
             self.parallel_lib_path = libpath
 
