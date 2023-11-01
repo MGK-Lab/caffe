@@ -282,12 +282,13 @@ class csc:
                 self.caffe.RunSimulation()
                 self.caffe.ReportScreen()
 
+                inflow_raster = np.zeros_like(
+                    self.caffe.water_depths, dtype=np.double)
+
                 if (np.sum(self.caffe.water_depths) > 0):
                     j = 0
                     k = 0
                     inflow = np.zeros(self.swmm_node_info.shape[0])
-                    inflow_raster = np.zeros_like(
-                        self.caffe.water_depths, dtype=np.double)
 
                     for i in nonflooded_nodes:
                         if i == 1:

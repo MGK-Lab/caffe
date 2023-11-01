@@ -9,12 +9,12 @@ cimport numpy as np
 from libc.math cimport pow
 from libc.stdio cimport printf
 
-
 cpdef CAffe_engine(np.ndarray[np.double_t, ndim = 1] water_levels,
                    np.ndarray[np.uint8_t, ndim = 1, cast=True] mask,
                    np.ndarray[np.double_t, ndim = 1] extra_volume_map,
                    np.ndarray[np.double_t, ndim = 1] max_f,
                    np.ndarray[np.int64_t, ndim = 1] DEMshape,
+                   double total_volume,
                    double cell_area,
                    double increment_constant,
                    double hf,
@@ -150,10 +150,17 @@ cpdef CAffe_engine(np.ndarray[np.double_t, ndim = 1] water_levels,
                 with gil:
                   print("\niteration", iteration)
                   print("spreaded volume [m3] =", "{:.3f}".format(volume_spread * cell_area))
-            if (volume_spread * cell_area == volume_spread_old and terminate == 0):
+
+            if ((volume_spread * cell_area - volume_spread_old < increment_constant) and terminate == 0):
                 terminate = 1
+
+            if ((total_volume - volume_spread * cell_area < 10. * increment_constant) and terminate == 0):
+                terminate = 1
+
             volume_spread_old = volume_spread * cell_area
+
             iteration += 1
+
         with gil:
             print("\niteration", iteration-1)
             print("spreaded volume [m3] =", "{:.3f}".format(volume_spread * cell_area))

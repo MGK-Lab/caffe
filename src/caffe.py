@@ -68,6 +68,7 @@ class caffe():
                 dtype=np.double, ndim=1, flags='C_CONTIGUOUS'),  # max_f
             np.ctypeslib.ndpointer(
                 dtype=np.int64, ndim=1, flags='C_CONTIGUOUS'),  # DEMshape
+            ctypes.c_double,  # total_volume
             ctypes.c_double,  # cell_area
             ctypes.c_double,  # increment_constant
             ctypes.c_double,  # hf
@@ -259,15 +260,17 @@ class caffe():
             print("Serial version used")
             core_serial.CAffe_engine(
                 self.water_levels, ClosedBC, self.excess_water_column_map,
-                self.max_f, np.asarray(self.DEMshape),
+                self.max_f, np.asarray(self.DEMshape), self.excess_total_volume,
                 self.cell_area, self.ic, self.hf, self.EVt)
         else:
             print("Parallel version used")
             self.lib.CAffe_engine(
                 self.water_levels, ClosedBC, self.excess_water_column_map,
                 self.max_f, np.asarray(self.DEMshape),
-                self.cell_area, self.ic, self.hf, self.EVt, self.threads)
+                self.excess_total_volume, self.cell_area, self.ic, self.hf,
+                self.EVt, self.threads)
 
+        self.water_levels = self.water_levels + self.excess_water_column_map
         self.water_levels = self.water_levels.reshape(self.DEMshape)
         self.ResetBCs()
         self.water_depths = self.water_levels - self.DEM
@@ -320,8 +323,9 @@ class caffe():
             self.max_water_levels[indices]),
             ", ", np.max(self.max_water_levels[indices]))
 
-        print("Sum of total spreaded volume: ", np.sum(
-            self.water_depths) * self.cell_area)
+        print("Sum of total spreaded volume: ", (np.sum(
+            self.water_depths) - np.sum(self.excess_water_column_map)) *
+            self.cell_area)
 
         print("Sum of non-spreaded volume:   ", np.sum(
             self.excess_water_column_map[self.ClosedBC == False])

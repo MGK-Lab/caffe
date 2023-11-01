@@ -138,11 +138,11 @@ void CAffe_engine(double* water_levels,
                     double* extra_volume_map,
                     double* max_f,
                     long* DEMshape,
+                    double total_volume,
                     double cell_area,
                     double increment_constant,
                     double hf,
                     double EV_threshold,
-                    double vol_cutoff,
                     int threads) {
 
     int terminate, iteration;
@@ -218,7 +218,9 @@ void CAffe_engine(double* water_levels,
             std::cout << "spreaded volume [m3] = " << volume_spread * cell_area << std::endl;
         }
 
-        if (terminate == 0 && (volume_spread * cell_area == volume_spread_old))
+        if (terminate == 0 && (volume_spread * cell_area - volume_spread_old < increment_constant))
+            terminate = 1;
+        if (terminate == 0 && (total_volume - volume_spread * cell_area < 10. * increment_constant))
             terminate = 1;
         volume_spread_old = volume_spread * cell_area;
 
