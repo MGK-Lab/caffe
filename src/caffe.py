@@ -288,7 +288,7 @@ class caffe():
         self.waterdepth_excess = True
 
         for i in range(1, len(self.rain)):
-            name = self.StepSimulationROG(name, i)
+            name = self.StepSimulationROG(i)
             self.ReportFile(name)
             self.Reset_WL_EVM()
 
