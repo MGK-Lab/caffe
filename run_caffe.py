@@ -14,10 +14,10 @@ if __name__ == "__main__":
     # to make an instance of the caffe class model
     sim = caffe(input_DEM_file)
     sim.setConstants(hf, increment_constant, EV_threshold)
-    sim.ExcessVolumeArray(np.array([[499, 499, 10000]]))
+    sim.ExcessVolumeArray(np.array([[499, 499, 2000]]))
     sim.OpenBCArray(np.array([[300, 300]]))
-    sim.EnableParallelRun(10)
+    sim.EnableParallelRun(4)
     sim.RunSimulation()
     sim.setOutputPath("./tests/")
-    sim.setOutputName("series")
+    sim.setOutputName("parallel")
     sim.CloseSimulation()

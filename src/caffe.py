@@ -49,7 +49,7 @@ class caffe():
 
     def EnableParallelRun(self, threads, libpath=''):
         if libpath == '':
-            self.parallel_lib_path = 'caffe_core_parallel.so'
+            self.parallel_lib_path = './caffe_core_parallel.so'
         else:
             self.parallel_lib_path = libpath
 
@@ -157,7 +157,7 @@ class caffe():
     def OpenBCArray(self, OBCM_np):
         # it takes an array of x and y coords (local) to create a raster-like
         # array of open boundary cells (as big wells)
-        self.OBC_cells = np.zeros_like(OBCM_np, dtype=np.int)
+        self.OBC_cells = np.zeros_like(OBCM_np, dtype=np.int64)
         OBCM_np = OBCM_np / self.length
 
         i = 0
@@ -170,7 +170,7 @@ class caffe():
     def ClosedBCArray(self, CBCM_np):
         # it takes an array of x and y coords (local) to create a raster-like
         # array of closed boundary cells (as big spikes)
-        self.CBC_cells = np.zeros_like(CBCM_np, dtype=np.int)
+        self.CBC_cells = np.zeros_like(CBCM_np, dtype=np.int64)
         CBCM_np = CBCM_np / self.length
 
         i = 0
