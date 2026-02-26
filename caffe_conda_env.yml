@@ -1,18 +1,16 @@
 # run conda env create -f caffe_conda_env.yml
 
-name: caffe
-channels:
-  - defaults
-  - ./channel
+name: dyncaffe
+
 dependencies:
-  - python=3.9.12
+  - python=3.10
   - cython
   - numpy
   - rasterio
   - pip
   - pip:
     - pyswmm
-  - hymo
+    - swmm-api
   - pytest
   - matplotlib
   - colorama

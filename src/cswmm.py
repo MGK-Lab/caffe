@@ -1,9 +1,11 @@
 from pyswmm import Simulation, Nodes, Output
 from swmm.toolkit.shared_enum import NodeAttribute
 from datetime import datetime, timedelta
-import hymo
+from swmm_api import read_inp_file
+# import hymo
 import numpy as np
 import pandas as pd
+
 
 
 class swmm:
@@ -13,7 +15,8 @@ class swmm:
         self.sim = Simulation(inp_file)
         print("\n")
         # load SWMM input file using hyno package
-        self._hymo_inp = hymo.SWMMInpFile(inp_file)
+        # self._hymo_inp = hymo.SWMMInpFile(inp_file)
+        self._inp = read_inp_file(inp_file)
         self.bounds = np.zeros(4)
         self.input_file = inp_file
 
@@ -26,17 +29,23 @@ class swmm:
         for n in self.nodes:
             self.nodes_info.loc[n.nodeid] = pd.DataFrame(
                 [[n.invert_elevation, n.full_depth, n.is_outfall()]], columns=c).loc[0]
+        
+        coords_dict = self._inp.COORDINATES
+        df_coords = pd.DataFrame({
+            "X_Coord": {k: v.x for k, v in coords_dict.items()},
+            "Y_Coord": {k: v.y for k, v in coords_dict.items()}
+            })
 
         self.nodes_info = pd.concat(
-            [self._hymo_inp.coordinates, self.nodes_info], axis=1)
-
+            [df_coords, self.nodes_info], axis=1)
+                
         self.node_list = list(self.nodes_info.index.values)
         self.No_Nodes = len(self.node_list)
 
-        self.bounds[0]=np.amin(self._hymo_inp.coordinates, axis=0)[0]
-        self.bounds[1]=np.amax(self._hymo_inp.coordinates, axis=0)[1]
-        self.bounds[2]=np.amax(self._hymo_inp.coordinates, axis=0)[0]
-        self.bounds[3]=np.amin(self._hymo_inp.coordinates, axis=0)[1]
+        self.bounds[0] = self.nodes_info['X_Coord'].min()   # xmin
+        self.bounds[1] = self.nodes_info['Y_Coord'].max()   # ymax
+        self.bounds[2] = self.nodes_info['X_Coord'].max()   # xmax
+        self.bounds[3] = self.nodes_info['Y_Coord'].min()   # ymin
 
     def Output_getNodesFlooding(self):
         # load PySWMM output file with the same file name
