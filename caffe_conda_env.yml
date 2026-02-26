@@ -4,8 +4,8 @@ name: dyncaffe
 
 dependencies:
   - python=3.10
-  - cython
   - numpy
+  - numba
   - rasterio
   - pip
   - pip:
