@@ -27,6 +27,7 @@ from dateutil.parser import parse
 import pandas as pd
 import ctypes
 from copy import deepcopy
+import platform
 
 
 class caffe():
@@ -66,11 +67,24 @@ class caffe():
         self.threads = 0
 
     def EnableParallelRun(self, threads, libpath=''):
+        # Determine the correct library file extension based on OS
+        system = platform.system()
+        if system == "Linux":
+            lib_ext = ".so"
+        elif system == "Darwin":
+            lib_ext = ".dylib"
+        elif system == "Windows":
+            lib_ext = ".dll"
+        else:
+            raise RuntimeError(f"Unsupported platform: {system}")
+
+        # If no custom path provided, use default filename in current folder
         if libpath == '':
-            self.parallel_lib_path = './caffe_core_parallel.so'
+            self.parallel_lib_path = os.path.join('.', f'caffe_core_parallel{lib_ext}')
         else:
             self.parallel_lib_path = libpath
 
+        # Load the library
         self.lib = ctypes.CDLL(self.parallel_lib_path)
         self.threads = threads
 
