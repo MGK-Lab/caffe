@@ -14,7 +14,7 @@ sudo apt install build-essential git htop
 ## 2. Clone the Repository
 
 ```bash
-git clone https://github.com/MGK-Lab/caffe.git
+git clone https://github.com/MGK-Lab/dyncaffe.git
 cd caffe
 ```
 
@@ -28,7 +28,7 @@ conda activate caffe
 ## 4. Build the Package
 
 ```bash
-python setup.py build_ext --inplace
+python setup.py
 ```
 
 ## 5. Run the First Test
