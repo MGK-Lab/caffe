@@ -1,7 +1,7 @@
 # Dynamic CA-ffe Setup and Installation
 
 Follow these steps to set up the environment, install the code, and run the first test.
-Step 1 can be skipped if you wish to use the serial version of the code.
+Step 1 and 4 can be skipped if you wish to use the serial version of the code.
 
 ## 1. Install System Dependencies
 
