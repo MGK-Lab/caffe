@@ -16,28 +16,69 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 # ------------------------------------------------------------------------------
 
-# run "python setup.py" for compiling C++ files  
+# run "python setup.py build_ext --inplace" for compiling C++ files  
 
-import subprocess
+from setuptools import setup, Extension
+import platform
+import sys
+import os
 
-# Compile the parallel C++ file
-process = subprocess.Popen(
-    [
-        'g++',
-        '-fopenmp',       # enable OpenMP
-        '-fPIC',          # generate position-independent code
-        './src/caffe_core_parallel.cpp',  # source file
-        '-shared',        # build shared library
-        '-o', 'caffe_core_parallel.so'    # output file
-    ],
-    stdout=subprocess.PIPE,
-    stderr=subprocess.PIPE
+system = platform.system()
+
+extra_compile_args = ["-O3"]
+extra_link_args = []
+
+if system == "Linux":
+    extra_compile_args += ["-fopenmp", "-fPIC"]
+    extra_link_args += [
+        "-fopenmp",
+        "-static-libgcc",
+        "-static-libstdc++"
+        # do NOT try to static-link libgomp
+    ]
+    library_name = "caffe_core_parallel.so"
+
+elif system == "Darwin":  # macOS
+    extra_compile_args += ["-Xpreprocessor", "-fopenmp"]
+    extra_link_args += ["-lomp"]
+    library_name = "caffe_core_parallel.dylib"
+
+elif system == "Windows":
+    extra_compile_args += ["-fopenmp"]
+    extra_link_args += ["-static-libgcc", "-static-libstdc++"]
+    library_name = "caffe_core_parallel.dll"
+
+else:
+    sys.exit(f"Unsupported OS: {system}")
+
+# Use setuptools Extension just to compile, then rename output manually
+module = Extension(
+    "_dummy_module",  # dummy name; we will ignore the generated file
+    sources=["src/caffe_core_parallel.cpp"],
+    language="c++",
+    extra_compile_args=extra_compile_args,
+    extra_link_args=extra_link_args,
 )
 
-stdout, stderr = process.communicate()
+setup(
+    name="caffe_core_parallel_build",
+    version="1.0.0",
+    ext_modules=[module],
+    script_args=["build_ext", "--inplace"]
+)
 
-if process.returncode != 0:
-    print("Compilation failed. Error message:")
-    print(stderr.decode('utf-8'))
+# Rename generated file to plain shared library
+import glob
+import shutil
+
+if system == "Linux":
+    ext = "*.so"
+elif system == "Darwin":
+    ext = "*.dylib"
 else:
-    print("caffe_core_parallel.cpp compilation was successful. The library is caffe_core_parallel.so")
+    ext = "*.pyd"
+
+built_files = glob.glob(ext)
+for f in built_files:
+    shutil.move(f, library_name)
+    print(f"Renamed {f} → {library_name}")
