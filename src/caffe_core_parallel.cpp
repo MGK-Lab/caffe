@@ -21,9 +21,17 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 #include <iostream>
 #include <cmath>
 #include <omp.h>
+#include <vector>
+
+#ifdef _WIN32
+#define EXPORT __declspec(dllexport)
+#else
+#define EXPORT
+#endif
 
 extern "C" {
 
+EXPORT
 inline void cell_rules(double* water_levels,
                     double* extra_volume_map,
                     double* max_f,
@@ -152,12 +160,12 @@ inline void cell_rules(double* water_levels,
 }
 
 
-
+EXPORT
 void CAffe_engine(double* water_levels,
                     bool* mask,
                     double* extra_volume_map,
                     double* max_f,
-                    long* DEMshape,
+                    int64_t* DEMshape,
                     double total_volume,
                     double cell_area,
                     double increment_constant,
@@ -182,13 +190,13 @@ void CAffe_engine(double* water_levels,
     else
         thread_num = threads;
     
+    std::cout << "\nThread numbers used = " << thread_num << std::endl;
+    
     omp_set_num_threads(thread_num);
 
-    double volume_spread_loc[thread_num];
-    for (int i = 0; i < thread_num; i++)
-        volume_spread_loc[i] = 0.;
+    std::vector<double> volume_spread_loc(thread_num, 0.0);
 
-    int i_val[2 * thread_num + 1];
+    std::vector<int> i_val(2 * thread_num + 1);
     i_val[2 * thread_num] = loop_end;
     for (int i = 0; i < 2 * thread_num; i++)
         i_val[i] = int(i * row_len * DEMshape[0] / thread_num / 2.0);
@@ -224,7 +232,7 @@ void CAffe_engine(double* water_levels,
                     }
                     cell_rules(water_levels, extra_volume_map, max_f,
                                 increment_constant, hf, EV_threshold, 
-                                volume_spread_loc[j], row_len, i);
+                                volume_spread_loc[j-1], row_len, i);
                 }
 
         for (int i = 0; i < thread_num; i++){

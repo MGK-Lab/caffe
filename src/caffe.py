@@ -67,46 +67,68 @@ class caffe():
         self.threads = 0
 
     def EnableParallelRun(self, threads, libpath=''):
-        # Determine the correct library file extension based on OS
-        system = platform.system()
-        if system == "Linux":
-            lib_ext = ".so"
-        elif system == "Darwin":
-            lib_ext = ".dylib"
-        elif system == "Windows":
-            lib_ext = ".dll"
+        if threads > 1:
+            # Determine OS library extension
+            system = platform.system()
+            if system == "Linux":
+                lib_ext = ".so"
+            elif system == "Windows":
+                lib_ext = ".dll"
+            else:
+                raise RuntimeError(f"Unsupported platform: {system}")
+
+            if libpath:
+                # Use the user-provided path directly
+                found_path = os.path.normpath(libpath)
+                if not os.path.exists(found_path):
+                    raise FileNotFoundError(f"Provided library path does not exist: {found_path}")
+            else:
+                # Start search from current drive root
+                drive = os.path.splitdrive(os.getcwd())[0] + os.sep
+                target_folder = "dyncaffe"
+                found_path = None
+
+                # Walk through all directories in the drive
+                for root, dirs, files in os.walk(drive):
+                    if target_folder in dirs:
+                        candidate = os.path.join(root, target_folder, "build", f"caffe_core_parallel{lib_ext}")
+                        if os.path.exists(candidate):
+                            found_path = candidate
+                            break
+
+                if found_path is None:
+                    raise FileNotFoundError(f"Could not find {target_folder}/build/caffe_core_parallel{lib_ext} on drive {drive}")
+
+                # Normalize path
+                found_path = os.path.normpath(found_path)
+
+            print(f"Library loaded from: {found_path}")
+
+            # Load the library
+            self.lib = ctypes.CDLL(found_path)
+            self.threads = threads
+
+            # Define the argument types for the C++ function for parallel computation
+            self.lib.CAffe_engine.argtypes = [
+                np.ctypeslib.ndpointer(
+                    dtype=np.double, ndim=1, flags='C_CONTIGUOUS'),  # water_levels
+                np.ctypeslib.ndpointer(
+                    dtype=np.bool, ndim=1, flags='C_CONTIGUOUS'),  # mask
+                np.ctypeslib.ndpointer(
+                    dtype=np.double, ndim=1, flags='C_CONTIGUOUS'),  # extra_volume_map
+                np.ctypeslib.ndpointer(
+                    dtype=np.double, ndim=1, flags='C_CONTIGUOUS'),  # max_f
+                np.ctypeslib.ndpointer(
+                    dtype=np.int64, ndim=1, flags='C_CONTIGUOUS'),  # DEMshape
+                ctypes.c_double,  # total_volume
+                ctypes.c_double,  # cell_area
+                ctypes.c_double,  # increment_constant
+                ctypes.c_double,  # hf
+                ctypes.c_double,  # EV_threshold
+                ctypes.c_int     # threads
+            ]
         else:
-            raise RuntimeError(f"Unsupported platform: {system}")
-
-        # If no custom path provided, use default filename in current folder
-        if libpath == '':
-            self.parallel_lib_path = os.path.join('.', f'caffe_core_parallel{lib_ext}')
-        else:
-            self.parallel_lib_path = libpath
-
-        # Load the library
-        self.lib = ctypes.CDLL(self.parallel_lib_path)
-        self.threads = threads
-
-        # Define the argument types for the C++ function for parallel computation
-        self.lib.CAffe_engine.argtypes = [
-            np.ctypeslib.ndpointer(
-                dtype=np.double, ndim=1, flags='C_CONTIGUOUS'),  # water_levels
-            np.ctypeslib.ndpointer(
-                dtype=np.bool, ndim=1, flags='C_CONTIGUOUS'),  # mask
-            np.ctypeslib.ndpointer(
-                dtype=np.double, ndim=1, flags='C_CONTIGUOUS'),  # extra_volume_map
-            np.ctypeslib.ndpointer(
-                dtype=np.double, ndim=1, flags='C_CONTIGUOUS'),  # max_f
-            np.ctypeslib.ndpointer(
-                dtype=np.int64, ndim=1, flags='C_CONTIGUOUS'),  # DEMshape
-            ctypes.c_double,  # total_volume
-            ctypes.c_double,  # cell_area
-            ctypes.c_double,  # increment_constant
-            ctypes.c_double,  # hf
-            ctypes.c_double,  # EV_threshold
-            ctypes.c_int     # threads
-        ]
+            print("The provided threads No <= 1, skipping parallel run. Using serial version.")
 
     def CloseSimulation(self, name=None):
         print("\n .....closing and reporting the CA-ffé simulation.....")
