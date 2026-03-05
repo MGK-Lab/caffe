@@ -1,57 +1,54 @@
-# Dynamic CA-ffe Setup and Installation
+# Dynamic CA-ffé
 
-Follow these steps to set up the environment, install the code, and run the first test.
-Step 1 and 4 can be skipped if you wish to use the serial version of the code.
+Dynamic CA-ffé is a **fast hybrid 1D/2D urban flood modelling framework** designed for rapid simulation of urban flash floods while maintaining accuracy comparable to traditional hydrodynamic models.
 
-## 1. Install System Dependencies
+The model integrates a **static 2D cellular automata (CA) overland flow model** with a **dynamic 1D drainage network model**, enabling efficient simulation of the interaction between surface runoff and stormwater drainage systems.
 
-### Linux (Ubuntu/Debian)
+Compared with conventional hydrodynamic models that solve the full shallow water equations, Dynamic CA-ffé provides **significantly faster simulations while maintaining reliable flood predictions**. This makes it particularly suitable for:
 
-Open a terminal and run:
+- Rapid urban flood assessment  
+- Operational flood forecasting  
+- Large-scale scenario testing  
+- Real-time or near real-time flood modelling applications  
 
-```bash
-sudo apt update
-sudo apt install -y build-essential g++ make python3-dev libgomp1 git htop
-````
-### macOS
+---
 
-Install Homebrew and then install required packages:
+# Scientific Background
 
-```bash
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-brew install gcc libomp git htop
-````
+Dynamic CA-ffé was introduced in the following research article:
 
-### Windows (MinGW-w64)
+**Gholami Korzani, M., Chaudhary, A., Jamali, B., & Deletic, A. (2026).**  
+*Dynamic CA-ffé: A hybrid 1D/2D fast flood evaluation model for urban flash floods.*  
+Journal of Hydrology, 665, 134762.  
+https://doi.org/10.1016/j.jhydrol.2025.134762
 
-Install MinGW-w64 (https://www.mingw-w64.org/getting-started/msys2/) and add g++ to your PATH (cmd approach: set PATH=%PATH%;C:\msys64\ucrt64\bin).
+The study presents a novel modelling framework that:
 
-## 2. Clone the GitHub Repository
+- Couples a **static conceptual 2D flood model** with a **dynamic 1D drainage network model**
+- Maintains **bi-directional interaction between surface flooding and drainage systems**
+- Produces accurate predictions of **flood depth and extent**
+- Achieves simulation speeds **more than an order of magnitude faster** than traditional hydrodynamic models.
 
-Install Git (https://github.com/git-guides/install-git) if you skipped the last step.
+If you use **Dynamic CA-ffé** in research, publications, or applications, please cite the article.
 
-```bash
-git clone https://github.com/MGK-Lab/dyncaffe.git
-cd dyncaffe
-```
+---
 
-## 3. Create and Activate Conda Environment
+# About the Developer
 
-Install miniconda (https://www.anaconda.com/docs/getting-started/miniconda/install) and then create the environment as below:
+**[Dr Maziar Gholami Korzani](https://www.qut.edu.au/about/our-people/academic-profiles/m.korzani)**  
+Lecturer in Water Engineering  
+School of Civil and Environmental Engineering  
+Queensland University of Technology (QUT), Australia  
+Email: m.korzani@qut.edu.au
 
-```bash
-conda env create -f caffe_conda_env.yml
-conda activate caffe
-```
+---
 
-## 4. Build the Package
+# License
 
-```bash
-python setup.py build_ext --inplace
-```
+This project is licensed under the **GNU General Public License v3.0 (GPL-3.0)**.
 
-## 5. Run the First Test
+For the full license text, see the `LICENSE` file in this repository or visit:
 
-```bash
-python run_caffe.py
-```
+https://www.gnu.org/licenses/gpl-3.0.en.html
+
+---
