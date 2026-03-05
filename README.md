@@ -43,6 +43,16 @@ Email: m.korzani@qut.edu.au
 
 ---
 
+# Documentation
+
+Please refer to the **[Wiki](https://github.com/MGK-Lab/dyncaffe/wiki)** for:
+
+- Installation instructions  
+- Setup and compilation guide  
+- User manual
+
+---
+
 # License
 
 This project is licensed under the **GNU General Public License v3.0 (GPL-3.0)**.
