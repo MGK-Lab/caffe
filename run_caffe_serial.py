@@ -34,8 +34,8 @@ if __name__ == "__main__":
     sim.setConstants(hf, increment_constant, EV_threshold)
     sim.ExcessVolumeArray(np.array([[499, 499, 2000]]))
     sim.OpenBCArray(np.array([[300, 300]]))
-    sim.EnableParallelRun(4)
     sim.RunSimulation()
     sim.setOutputPath("./tests/")
-    sim.setOutputName("parallel")
+    sim.setOutputName("serial")
     sim.CloseSimulation()
+
