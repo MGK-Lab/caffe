@@ -241,10 +241,10 @@ void CAffe_engine(double* water_levels,
         }
 
 
-        if (iteration % 2000 == 0) {
-            std::cout << "\niteration " << iteration << std::endl;
-            std::cout << "spreaded volume [m3] = " << volume_spread * cell_area << std::endl;
-        }
+        // if (iteration % 2000 == 0) {
+        //     std::cout << "\niteration " << iteration << std::endl;
+        //     std::cout << "spreaded volume [m3] = " << volume_spread * cell_area << std::endl;
+        // }
 
         if (terminate == 0 && (volume_spread * cell_area - volume_spread_old < increment_constant))
             terminate = 1;
@@ -254,8 +254,8 @@ void CAffe_engine(double* water_levels,
 
         iteration++;
     }
-    std::cout << "\niteration " << iteration-1 << std::endl;
-    std::cout << "spreaded volume [m3] = " << volume_spread * cell_area << std::endl;
+    // std::cout << "\niteration " << iteration-1 << std::endl;
+    // std::cout << "spreaded volume [m3] = " << volume_spread * cell_area << std::endl;
 
     omp_destroy_lock(&lock);
 

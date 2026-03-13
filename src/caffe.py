@@ -36,36 +36,48 @@ class caffe():
         print("\n", time.ctime(), "\n")
 
         self.dem_file = dem_file
-        self.DEM, self.mask_dem, self.bounds, self.length = util.RasterToArray(
-            dem_file)
+        # Convert DEM to float64 explicitly
+        DEM_raw, mask_dem, self.bounds, self.length = util.RasterToArray(dem_file)
+        self.DEM = DEM_raw.astype(np.float64)
+        self.mask_dem = mask_dem.astype(bool)
+        
         self.ClosedBC = deepcopy(self.mask_dem)
         self.DEMshape = self.DEM.shape
 
-        self.DEM[self.ClosedBC == True] = np.amax(self.DEM)
+        # Ensure DEM values used for closed BC are float64
+        self.DEM[self.ClosedBC] = np.max(self.DEM)
 
-        # to initialise a CAffe model
-        self.BCtol = 1.0e6
-        self.cell_area = self.length**2
-        self.vol_cutoff = 0.1
+        # CAffe model parameters
+        self.BCtol = np.float64(1.0e6)
+        self.cell_area = np.float64(self.length ** 2)
+        self.vol_cutoff = np.float64(0.1)
         self.setConstants_has_been_called = False
-        self.water_levels = deepcopy(self.DEM)
-        self.water_depths = np.zeros_like(self.DEM, dtype=np.double)
-        self.excess_volume_map = np.zeros_like(self.DEM, dtype=np.double)
-        self.OpenBC = np.zeros_like(self.DEM, dtype=np.bool)
+
+        # All working arrays in float64
+        self.water_levels = deepcopy(self.DEM).astype(np.float64)
+        self.water_depths = np.zeros_like(self.DEM, dtype=np.float64)
+        self.excess_volume_map = np.zeros_like(self.DEM, dtype=np.float64)
+
+        # Boolean arrays stay as bool
+        self.OpenBC = np.zeros_like(self.DEM, dtype=bool)
+
         self.waterdepth_excess = False
         self.outputs_path = "./"
-        name = dem_file.split('/')
-        name = name[-1].split('.')
+
+        # Output name
+        name = dem_file.split('/')[-1].split('.')
         self.outputs_name = name[0] + "_out"
-        self.CBC_cells = np.array([])
-        self.OBC_cells = np.array([])
+
+        self.CBC_cells = np.array([], dtype=int)
+        self.OBC_cells = np.array([], dtype=int)
         self.start_date_time = None
         self.end_date_time = None
         self.initialised = False
         self.RainOnGrid = False
         self.rain = None
         self.threads = 0
-
+        
+        
     def EnableParallelRun(self, threads, libpath=''):
         if threads > 1:
             # Determine OS library extension

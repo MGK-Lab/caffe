@@ -19,12 +19,13 @@
 import numpy as np
 import rasterio
 
-def compare_dems(dem1_path, dem2_path):
+def compare_dems(dem1_path, dem2_path, output_path):
 
     # --- Load DEM 1 ---
     with rasterio.open(dem1_path) as src1:
         dem1 = src1.read(1).astype(np.float64)
         nodata1 = src1.nodata
+        profile = src1.profile
 
     # --- Load DEM 2 ---
     with rasterio.open(dem2_path) as src2:
@@ -42,27 +43,56 @@ def compare_dems(dem1_path, dem2_path):
     if dem1.shape != dem2.shape:
         raise ValueError("DEM files have different shapes")
 
-    # --- Relative difference ---
-    # (dem1 - dem2) / dem2
-    with np.errstate(divide='ignore', invalid='ignore'):
-        relative_diff = (dem1 - dem2) / dem2
+    # --- Compute difference ---
+    relative_diff = np.zeros_like(dem1)
 
-    # Replace inf and nan (caused by division by zero) with 0
-    relative_diff[~np.isfinite(relative_diff)] = 0.0
+    # Where DEM2 is not zero → relative difference
+    mask_rel = dem2 != 0
+    relative_diff[mask_rel] = (dem1[mask_rel] - dem2[mask_rel]) / dem2[mask_rel]
+
+    # Where DEM2 is zero → absolute difference
+    mask_abs = dem2 == 0
+    relative_diff[mask_abs] = np.abs(dem1[mask_abs] - dem2[mask_abs])
 
     # --- Statistics ---
     min_diff = np.min(relative_diff)
     max_diff = np.max(relative_diff)
     mean_diff = np.mean(relative_diff)
 
-    print("Relative Difference Statistics")
+    print("Difference Statistics")
     print(f"Min  : {min_diff:.6e}")
     print(f"Max  : {max_diff:.6e}")
     print(f"Mean : {mean_diff:.6e}")
+    
+    tolerance = 1e-6  # adjust if needed
 
-    return relative_diff, min_diff, max_diff, mean_diff
+    diff = np.abs(dem1 - dem2)
+
+    mismatch_mask = diff > tolerance
+    num_mismatch = np.sum(mismatch_mask)
+
+    total_cells = dem1.size
+    match_cells = total_cells - num_mismatch
+
+    print("\nCell Comparison")
+    print(f"Total cells      : {total_cells}")
+    print(f"Matching cells   : {match_cells}")
+    print(f"Mismatching cells: {num_mismatch}")
+    print(f"Mismatch percent : {100*num_mismatch/total_cells:.6f}%")
+
+    # --- Save raster ---
+    profile.update(dtype=rasterio.float32, count=1)
+
+    with rasterio.open(output_path, "w", **profile) as dst:
+        dst.write(relative_diff.astype(np.float32), 1)
+
+    print(f"\nOutput DEM saved to: {output_path}")
+
+    return relative_diff
 
 
-dem1 = "1_max_all_mwd.tif"
-dem2 = "./maz/_max_all_mwd.tif"
-compare_dems(dem1,dem2)
+dem1 = "./tests/parallel_mwd.tif"
+dem2 = "./tests/serial_mwd.tif"
+output = "./tests/relative_difference.tif"
+
+compare_dems(dem1, dem2, output)
