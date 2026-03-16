@@ -74,7 +74,7 @@ class csc:
                 "The SWMM junctions coordinates are out of the boundry of the provided DEM")
 
         # convert node locations to DEM numpy system
-        # coulumns are: 1 and 2 coordinates, 3 elevation, 4 outfall and 5 active
+        # coulumns are: 1 and 2 coordinates, 3 elevation, 4 full depth, 5 outfall and 6 active
         self.swmm_node_info = self.swmm.nodes_info.to_numpy()
         self.swmm_node_info = np.column_stack(
             (self.swmm_node_info[:, 0],
@@ -129,14 +129,14 @@ class csc:
         err = False
         i = 0
         for r in self.swmm_node_info:
-            if ((abs(r[2] - self.caffe.DEM[np.int_(r[0]), np.int_(r[1])])
+            if ((abs(r[2] + r[3] - self.caffe.DEM[np.int_(r[0]), np.int_(r[1])])
                     > self.elv_dif * self.caffe.DEM[np.int_(r[0]), np.int_(r[1])]) and r[3] == False):
                 if not (self.recrusive_run):
                     print(
                         self.swmm.node_list[i],
                         " diff = ", self.caffe.DEM
                         [np.int_(r[0]),
-                         np.int_(r[1])] - r[2])
+                         np.int_(r[1])] - r[2] - r[3])
                 self.failed_node_check = np.append(
                     self.failed_node_check, np.int_(i))
                 err = True
